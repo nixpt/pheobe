@@ -199,9 +199,7 @@ fn from_result_object(v: &Value) -> (WorkerOutcome, bool) {
     // the engine's final message may itself be the handoff contract in JSON —
     // if it parses as an object, hand it up as json_tail (only contract keys
     // merge; see agent::run_worker)
-    let json_tail = serde_json::from_str::<Value>(&final_text)
-        .ok()
-        .filter(|j| j.is_object());
+    let json_tail = crate::worker::extract_json_tail(&final_text);
     (
         WorkerOutcome {
             final_text,

@@ -12,6 +12,7 @@ mod opencode;
 mod outcome;
 mod p10;
 mod scripted;
+mod worker_route;
 
 use std::path::Path;
 

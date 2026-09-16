@@ -11,6 +11,8 @@ calling handoff".
 **Severity:** P2 — Claude reasoned around it; a weaker engine will stall
 looking for a tool that does not exist, or never end the run.
 
+**Status:** Done (PHEOBE-22)
+
 ## Expected behavior
 
 The worker prompt describes the same six stages in terms the engine can act

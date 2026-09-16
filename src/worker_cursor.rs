@@ -168,9 +168,7 @@ fn from_result_object(v: &Value) -> WorkerOutcome {
             v.get("usage")
                 .and_then(|u| u.get("total_tokens").and_then(|t| t.as_u64()))
         });
-    let json_tail = serde_json::from_str::<Value>(&final_text)
-        .ok()
-        .filter(|j| j.is_object());
+    let json_tail = crate::worker::extract_json_tail(&final_text);
     WorkerOutcome {
         final_text,
         tokens,

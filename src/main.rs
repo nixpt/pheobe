@@ -23,6 +23,11 @@ enum Cmd {
         /// Override the branch name
         #[arg(long)]
         branch: Option<String>,
+        /// Emit the report as JSON on stdout. This is already the only output
+        /// mode; the flag exists so the adopt kits' `pheobe run … --json`
+        /// is a valid invocation.
+        #[arg(long)]
+        json: bool,
     },
     /// Run the done_when + allowlist gate only (host mode's exit gate)
     Verify {
@@ -141,7 +146,9 @@ fn main() {
 fn run_cmd() -> Result<()> {
     let cli = Cli::parse();
     match cli.cmd {
-        Cmd::Run { task_file, branch } => cmd_run(&task_file, branch),
+        Cmd::Run {
+            task_file, branch, ..
+        } => cmd_run(&task_file, branch),
         Cmd::Verify {
             task_file,
             worktree,
@@ -176,6 +183,20 @@ fn cmd_verify(task_file: &str, worktree: Option<String>) -> Result<()> {
     let ev = verify::run_done_when(&task, &cwd)?;
     let (violations, _byproducts) = worktree::check_allowlist(&cwd, &task.paths_allow)?;
     if !ev.passed || !violations.is_empty() {
+        if !ev.passed {
+            // issue 08: the host is a model reading this — name the command,
+            // the exit, and what it printed, or it has to re-run it by hand
+            eprintln!("✗ done_when failed: {}", ev.ran);
+            for line in ev
+                .output_excerpt
+                .as_deref()
+                .unwrap_or("")
+                .lines()
+                .filter(|l| !l.trim().is_empty())
+            {
+                eprintln!("  {line}");
+            }
+        }
         for v in violations {
             eprintln!("  ✋ outside paths_allow: {v}");
         }

@@ -9,6 +9,8 @@ excerpt, even though `run_done_when` already captures all three.
 **Severity:** P3 — host mode's whole premise is a mechanical gate the host
 reads; a bare "failed" makes the host guess.
 
+**Status:** Done (PHEOBE-22)
+
 ## Expected behavior
 
 ```

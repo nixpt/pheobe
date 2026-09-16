@@ -166,7 +166,7 @@ impl Worker for OpenCodeWorker {
             bail!("{why}");
         }
 
-        let json_tail = extract_json_tail(&final_text);
+        let json_tail = crate::worker::extract_json_tail(&final_text);
         Ok(WorkerOutcome {
             final_text,
             tokens,
@@ -260,31 +260,4 @@ fn parse_stream(raw: &str) -> (String, Option<u64>, Option<f64>, Option<String>)
         saw_usd.then_some(usd),
         error,
     )
-}
-
-/// The engine's tail may be the handoff JSON itself (the host kit tells it
-/// the report shape): try the whole final text, then a ```json fence, then
-/// the widest `{...}` span. Only objects count as handoff-shaped.
-fn extract_json_tail(final_text: &str) -> Option<Value> {
-    let t = final_text.trim();
-    let try_obj = |v: Value| if v.is_object() { Some(v) } else { None };
-    if let Ok(v) = serde_json::from_str::<Value>(t) {
-        return try_obj(v);
-    }
-    if let Some(start) = t.find("```json") {
-        let body = &t[start + 7..];
-        if let Some(end) = body.find("```") {
-            if let Ok(v) = serde_json::from_str::<Value>(body[..end].trim()) {
-                return try_obj(v);
-            }
-        }
-    }
-    if let (Some(start), Some(end)) = (t.find('{'), t.rfind('}')) {
-        if start < end {
-            if let Ok(v) = serde_json::from_str::<Value>(&t[start..=end]) {
-                return try_obj(v);
-            }
-        }
-    }
-    None
 }

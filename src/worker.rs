@@ -29,6 +29,47 @@ pub struct WorkerOutcome {
     pub json_tail: Option<Value>,
 }
 
+/// The engine's final message may itself be the handoff contract: bare
+/// JSON, a ```json fence with prose around it (claude, issue 06), or an
+/// object embedded in a longer answer. Try the whole text, then the LAST
+/// fence, then the widest `{...}` span. Only handoff-shaped objects count
+/// (`ok` or `summary` present); an empty `blocked` is the model stating
+/// "nothing blocks me" and is dropped, since agent::normalize honors presence.
+pub fn extract_json_tail(final_text: &str) -> Option<Value> {
+    let t = final_text.trim();
+    let shaped = |v: Value| -> Option<Value> {
+        if !v.is_object() || (v.get("ok").is_none() && v.get("summary").is_none()) {
+            return None;
+        }
+        let mut v = v;
+        if v.get("blocked").and_then(|b| b.as_str()) == Some("") {
+            v.as_object_mut().unwrap().remove("blocked");
+        }
+        Some(v)
+    };
+    if let Ok(v) = serde_json::from_str::<Value>(t) {
+        return shaped(v);
+    }
+    if let Some(start) = t.rfind("```json") {
+        let body = &t[start + 7..];
+        if let Some(end) = body.find("```") {
+            if let Ok(v) = serde_json::from_str::<Value>(body[..end].trim()) {
+                if let Some(v) = shaped(v) {
+                    return Some(v);
+                }
+            }
+        }
+    }
+    if let (Some(start), Some(end)) = (t.find('{'), t.rfind('}')) {
+        if start < end {
+            if let Ok(v) = serde_json::from_str::<Value>(&t[start..=end]) {
+                return shaped(v);
+            }
+        }
+    }
+    None
+}
+
 /// One prompt out, one whole run back. The engine owns its internal loop;
 /// pheobe owns everything mechanical around it (aging ladder, budget, gates).
 pub trait Worker {

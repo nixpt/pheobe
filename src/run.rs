@@ -45,6 +45,7 @@ pub fn run_task(
         );
     }
     let (wt, branch) = worktree::provision(&repo, &branch)?;
+    let base_sha = worktree::head_sha(&wt)?;
     progress(&format!("🍳 worktree: {}  branch: {branch}", wt.display()));
     let repo_str = repo.display().to_string();
     let session = learn::begin_session(&repo, &task.task)?;
@@ -107,7 +108,6 @@ pub fn run_task(
     };
 
     // mechanical gates run after the loop and have the final word over the model
-    let mut commits = vec![];
     let dirty = worktree::status_dirty(&wt)?;
     if outcome.ok && dirty {
         let (violations, byproducts) = worktree::check_allowlist(&wt, &task.paths_allow)?;
@@ -125,14 +125,16 @@ pub fn run_task(
             );
             return Ok(rep);
         }
-        let sha = worktree::commit(
+        worktree::commit(
             &wt,
             &task_id,
             outcome.summary.as_deref().unwrap_or(&task.task),
             &task.paths_allow,
         )?;
-        commits.push(sha);
     }
+    // everything on the branch since provision — the engine's own commits
+    // (worker route) and the gate's (issue 05)
+    let commits = worktree::commits_since(&wt, &base_sha)?;
 
     let tests = if outcome.ok || dirty {
         Some(verify::run_done_when(task, &wt)?)

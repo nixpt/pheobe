@@ -256,6 +256,10 @@ fn parse_go(text: &str) -> Option<TestReport> {
         }
     }
 
+    // go package-level lines look like `ok  \tpkg\t0.5s` / `ok  \tpkg\t(cached)`;
+    // a bare `ok <name>` is some other runner's line protocol (a stdlib
+    // python harness, a shell script) — still countable, not go.
+    let mut go_shaped = false;
     if !saw_marker {
         // no per-test markers (e.g. non-verbose): package-level lines only
         for l in &lines {
@@ -270,6 +274,18 @@ fn parse_go(text: &str) -> Option<TestReport> {
                 );
             } else if t.starts_with("ok ") || t.starts_with("ok\t") {
                 passed += 1;
+                let tail = t.trim_end();
+                if t.starts_with("ok\t")
+                    || t.starts_with("ok  ")
+                    || tail.ends_with("(cached)")
+                    || tail.ends_with('s')
+                        && tail
+                            .rsplit(['\t', ' '])
+                            .next()
+                            .is_some_and(|d| d.trim_end_matches('s').parse::<f64>().is_ok())
+                {
+                    go_shaped = true;
+                }
             }
         }
         if passed + failed == 0 {
@@ -278,7 +294,12 @@ fn parse_go(text: &str) -> Option<TestReport> {
     }
 
     Some(TestReport {
-        runner: "go".into(),
+        runner: if saw_marker || go_shaped {
+            "go"
+        } else {
+            "ok-lines"
+        }
+        .into(),
         total: passed + failed,
         passed,
         failed,
@@ -360,6 +381,16 @@ mod tests {
         assert_eq!(r.total, 2);
         let f = r.failures.iter().find(|f| f.name == "TestSub").unwrap();
         assert_eq!(f.file, "calc_test.go:12");
+    }
+
+    #[test]
+    fn parse_bare_ok_lines_are_not_go() {
+        // a python stdlib harness printing `ok <name>` / `FAIL <name>` (s457)
+        let text = "ok test_add\nFAIL test_div AssertionError()\nok test_mod\n";
+        let r = parse(text).unwrap();
+        assert_eq!(r.runner, "ok-lines");
+        assert_eq!(r.passed, 2);
+        assert_eq!(r.failed, 1);
     }
 
     #[test]
