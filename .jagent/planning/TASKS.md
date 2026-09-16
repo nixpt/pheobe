@@ -79,6 +79,13 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 - [x] promoted 2026-09-16: `nixpt/pheobe` public, v0.1.0 hand-tagged, v0.2.0 minted by release.yml, **pheobe 0.2.0 on crates.io**
 - [x] PHEOBE-30 — release.yml dispatches publish.yml at the minted tag (bot tags raise no push event)
 - [x] PHEOBE-33 — AGENTS.md + CLAUDE.md generated from `.dejavue/context.md`; agents section in CONTRIBUTING
+
+## M3 — fidelity and proof
+
+- [ ] **PHEOBE-34** (`tickets/PHEOBE-34-cli-contract-tests.md`) — CLI contract tests driving the real binary; `main.rs` 0% → ≥ 70%. **Open for pickup** — claim on the channel.
+- [ ] **PHEOBE-35** (`tickets/PHEOBE-35-search-tool-tests.md`) — barn `search`/`structural` tool tests; `tools/search.rs` 14% → ≥ 80%. **Open for pickup** — claim on the channel.
+- [x] PHEOBE-36 — `.jagent/` refreshed: PROJECT.md (public repo, crate, channel), STATE.md (M2 done, coverage, open items), ROADMAP (M0–M2 ✅, M3 current)
+- coverage baseline (cargo-llvm-cov, 2026-09-16): 79.31% lines / 77.69% regions / 75.84% functions
 - [x] PHEOBE-31 — `pheobe doctor` prints compiled version vs crates.io / github tags
 - [x] PHEOBE-32 — `pheobe update` (`cargo install pheobe --locked --force`; git fallback) — shipped as 0.3.0
 - [x] crates.io Trusted Publishing configured (captain, 2026-09-16), proven via `publish.yml verify_auth`; `CARGO_REGISTRY_TOKEN` secret deleted — publish.yml runs on OIDC only
