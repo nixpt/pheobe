@@ -487,6 +487,38 @@ polydex index reads > raw text tools, in that order, each skipped (and
 noted) when absent. No pheobe-owned indexing, no embedder, no MCP — both
 tools are subprocesses on PATH, same skip-don't-fail posture as dejavue.
 
+## Borrowed: joker learning + memory — closed-loop lessons (optional, overridable)
+
+**Source:** exosphere `memory-service::learning` (closed-loop learning,
+inspired by hermes-agent) + joker-mcp's `LearningService`/UKS (`kcs`
+KnowledgeUnit lifecycle) + `joker_store_fact`/`joker_recall_facts`.
+
+pheobe borrows the **closed-loop** half — sessions, passive events, nudges —
+and deliberately leaves the rest:
+
+| borrowed | what | v0 shape |
+|---|---|---|
+| `learning_sessions` | run lifecycle (start/end/outcome) | `sessions.jsonl` append-only |
+| `session_events` | passive capture of every loop stage / tool call | `events.jsonl` |
+| `nudge_items` | resurfaced gotchas scoped per repo, injected at **orient** next to the `ctx brief` (ctx = the world *what*, verified markdown; nudges = repo ops *gotchas*, earned by runs) | `nudges.jsonl` + `pheobe learn nudge/nudges` |
+| post-session review | events → lessons → nudges | self mode: cheap second pass after the loop (v0.2); **host mode: the parent does it** (it already saw the run) |
+| `skill_candidates` | auto-extracted procedures pending human approval | v0.2 — nudges that keep recurring graduate to skill candidates |
+| facts store / knowledge graph / user profile | joker's identity memory | **not borrowed** — pheobe keeps no second memory layer; repo knowledge lives in `.dejavue/`, user facts stay in the host's memory |
+
+**Opt-in by default.** Disabled unless `PHEOBE_LEARN=1` or
+`~/.pheobe/learning/` already exists (or `PHEOBE_LEARNING_DIR` is set) — a
+scoped worker defaults to memoryless; the store is an operator choice. The
+v0 store is JSONL, keeping the default build dependency-free; the upstream
+SQLite/FTS shape returns if the corpus is ever pointed at the shared joker
+DB via config.
+
+**Host-mode override.** `PHEOBE_MEMORY=none|local|host` (default `local`):
+`host` reads/writes the adopting harness's own memory surface
+(`joker_store_fact` on a joker box, claude/codex memory when they grow one)
+instead of pheobe's files; `none` keeps the run memoryless. The kit
+declares the mapping; the store interface is one trait in code so the
+override is a swap, not a fork.
+
 ## Borrowed: jokersquad host-layer (final sweep)
 
 | borrow | what | where in pheobe |

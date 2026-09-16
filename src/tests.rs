@@ -1,4 +1,5 @@
-//! Contract tests: the task schema, the plan file, the allowlist check.
+//! Contract tests: the task schema, the plan file, the allowlist check, the learn store.
+use std::path::Path;
 
 use crate::plan;
 use crate::task::Task;
@@ -74,4 +75,32 @@ fn ctx_brief_carries_the_preamble() {
     assert!(b.contains("THIS IS RIGHT AND YOU ARE WRONG"));
     assert!(b.contains("Do not guess an API into existence"));
     assert!(b.contains("### tokio"));
+}
+
+#[test]
+fn learn_disabled_by_default_and_sessions_append_when_enabled() {
+    // default: off
+    assert!(!crate::learn::enabled());
+
+    // on: sessions begin + end append to the jsonl store
+    let dir = std::env::temp_dir().join(format!("pheobe-learn-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    unsafe { std::env::set_var("PHEOBE_LEARNING_DIR", &dir) };
+    assert!(crate::learn::enabled());
+
+    let s = crate::learn::begin_session(Path::new("/tmp/fake-repo"), "test task").unwrap().unwrap();
+    crate::learn::store_nudge("/tmp/fake-repo", "test harness needs the vendored source", Some("test harness")).unwrap();
+    let nudges = crate::learn::nudges_for("/tmp/fake-repo");
+    assert_eq!(nudges.len(), 1);
+    assert!(nudges[0].contains("vendored source"));
+
+    crate::learn::end_session(Some(&s), "done", 0).unwrap();
+    let txt = std::fs::read_to_string(dir.join("sessions.jsonl")).unwrap();
+    assert_eq!(txt.lines().count(), 2); // begin + end
+    let last: serde_json::Value = serde_json::from_str(txt.lines().last().unwrap()).unwrap();
+    assert_eq!(last["outcome"], "done");
+    assert_eq!(last["exit_code"], 0);
+
+    std::fs::remove_dir_all(&dir).ok();
+    unsafe { std::env::remove_var("PHEOBE_LEARNING_DIR") };
 }

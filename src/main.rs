@@ -4,7 +4,7 @@
 
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
-use pheobe::{knowledge, plan, report, task, verify, worktree};
+use pheobe::{knowledge, learn, plan, report, task, verify, worktree};
 use std::path::{Path, PathBuf};
 
 #[derive(Parser, Debug)]
@@ -37,6 +37,11 @@ enum Cmd {
         #[command(subcommand)]
         cmd: CtxCmd,
     },
+    /// Closed-loop learning store (borrowed from joker's learning module)
+    Learn {
+        #[command(subcommand)]
+        cmd: LearnCmd,
+    },
     /// Print/validate an adoption kit
     Adopt {
         #[command(subcommand)]
@@ -68,6 +73,26 @@ enum AdoptCmd {
     Codex,
 }
 
+#[derive(Subcommand, Debug)]
+enum LearnCmd {
+    /// Store a learned nudge scoped to a repo
+    Nudge {
+        /// Repo path this gotcha applies to
+        #[arg(long)]
+        repo: String,
+        /// The lesson / gotcha text
+        text: String,
+        /// Optional trigger terms (comma-separated) that should resurface it
+        #[arg(long)]
+        terms: Option<String>,
+    },
+    /// List stored nudges for a repo
+    Nudges {
+        #[arg(long)]
+        repo: String,
+    },
+}
+
 fn main() {
     if let Err(e) = run_cmd() {
         eprintln!("pheobe: {e:#}");
@@ -81,6 +106,7 @@ fn run_cmd() -> Result<()> {
         Cmd::Run { task_file, branch } => cmd_run(&task_file, branch),
         Cmd::Verify { task_file, worktree } => cmd_verify(&task_file, worktree),
         Cmd::Ctx { cmd } => cmd_ctx(cmd),
+        Cmd::Learn { cmd } => cmd_learn(cmd),
         Cmd::Adopt { cmd } => cmd_adopt(cmd),
         Cmd::Doctor => cmd_doctor(),
     }
@@ -103,10 +129,16 @@ fn cmd_run(task_file: &str, branch: Option<String>) -> Result<()> {
     }
     let (wt, branch) = worktree::provision(&repo, &branch)?;
     eprintln!("🍳 worktree: {}  branch: {branch}", wt.display());
+    let repo_str = repo.display().to_string();
+    let session = learn::begin_session(&repo, &task.task)?;
 
-    // orient: knowledge drive brief (repo-local + global drives)
+    // orient: knowledge drive brief (repo-local + global drives) + learned nudges
     let entries = knowledge::load_all(Some(&wt))?;
     let _brief = knowledge::brief(&entries);
+    let nudges = learn::nudges_for(&repo_str);
+    if !nudges.is_empty() {
+        eprintln!("📚 {} learned nudge(s) for this repo", nudges.len());
+    }
 
     // plan file seeded with the task; steps filled by the model turn
     plan::save(&wt, &plan::Plan { task: task.task.clone(), steps: vec![] })?;
@@ -114,6 +146,8 @@ fn cmd_run(task_file: &str, branch: Option<String>) -> Result<()> {
     // THE MODEL TURN IS THE ONE UNWIRED PIECE (v0.2): uno feature / OpenAI-shaped
     // endpoint. Until wired, the mechanical stages still run — and the run
     // reports honestly instead of pretending.
+    let blocked = "model loop not wired in v0.1 — mechanical stages live, turn loop pending";
+    let _ = learn::end_session(session.as_ref(), "blocked", 1);
     let report = report::HandoffReport {
         ok: false,
         task: task.task.clone(),
@@ -124,7 +158,7 @@ fn cmd_run(task_file: &str, branch: Option<String>) -> Result<()> {
         summary: None,
         next_steps: vec!["wire the model endpoint (PHEOBE_BASE_URL/PHEOBE_MODEL) and rerun".into()],
         doubts: vec![],
-        blocked: Some("model loop not wired in v0.1 — mechanical stages live, turn loop pending".into()),
+        blocked: Some(blocked.into()),
         usage: None,
     };
     report::emit(&report)
@@ -177,6 +211,26 @@ fn cmd_adopt(cmd: AdoptCmd) -> Result<()> {
         AdoptCmd::Claude => print!("{}", include_str!("../adopt/claude/self-agent.md")),
         AdoptCmd::Opencode => print!("{}", include_str!("../adopt/opencode/host-agent.md")),
         AdoptCmd::Codex => print!("{}", include_str!("../adopt/codex/README.md")),
+    }
+    Ok(())
+}
+
+fn cmd_learn(cmd: LearnCmd) -> Result<()> {
+    match cmd {
+        LearnCmd::Nudge { repo, text, terms } => {
+            learn::store_nudge(&repo, &text, terms.as_deref())?;
+            println!("📚 nudge stored for {repo}");
+        }
+        LearnCmd::Nudges { repo } => {
+            let nudges = learn::nudges_for(&repo);
+            if nudges.is_empty() {
+                println!("no nudges for {repo}");
+            } else {
+                for n in nudges {
+                    println!("  · {n}");
+                }
+            }
+        }
     }
     Ok(())
 }

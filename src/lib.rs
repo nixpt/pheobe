@@ -5,11 +5,12 @@
 //! is not. See DESIGN.md.
 
 pub mod knowledge;
+pub mod learn;
 pub mod plan;
 pub mod report;
 pub mod task;
-#[cfg(test)]
-mod tests;
-
 pub mod verify;
 pub mod worktree;
+
+#[cfg(test)]
+mod tests;
