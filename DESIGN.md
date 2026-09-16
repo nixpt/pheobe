@@ -125,6 +125,7 @@ re-run from scratch; the plan file is the only durable intermediate state.
   "ttl": "45m",
   "budget": { "max_iterations": 8, "max_usd": 1.0 },
   "paths_allow": ["src/report.rs", "tests/"],
+  "sandbox": "moderate",
   "push": false
 }
 ```
@@ -227,6 +228,60 @@ mock-provider-tested end-to-end.)*
 
 Toolset in v0 = pheobe's own built-in tools only; MCP is deliberately out
 (v0 non-goal) — a subagent shouldn't need its own servers.
+
+## Sandboxing ladder (self + host modes)
+
+Sandboxing is per-task and laddered, not binary — but **"free" is still
+restricted** (no world run). The invariant across all tiers: the worktree
+is the whole writable world; the destructive guard and `paths_allow` are
+never off; protected branches are never pushed.
+
+```
+task.sandbox: "strict" | "moderate" | "free"     (default: moderate)
+PHEOBE_SANDBOX                                    (env override, wins)
+```
+
+| tier | enforcement | network | bash | degradation when no bwrap/buckets |
+|---|---|---|---|---|
+| **strict** | `buckets run` (bwrap): mount ns + PID ns, toolchain dirs read-only binds, worktree read-write only, everything else invisible | **off** — deps must be vendored/locked; anything missing is a doubt | allowlisted shapes only (done_when, test/build commands) — the model proposes, the ladder matches | **fail closed**: `blocked: "no_sandbox"` — never a silent downgrade |
+| **moderate** (default) | same bwrap binds as strict, plus `buckets`' network-on path (package registries reachable) | on | any command inside the worktree, destructive-guard scanned | process capsule (bro's `process` tier: env-cleared subprocess, cwd-jailed) + a `doubts` note saying containment dropped |
+| **free** | policy only, no namespace — but never unrestricted: safe-exec scan always on, root jail (absolute paths escaping the worktree are refused), `paths_allow` at tool level + pre-commit, no protected branches, no source-checkout writes | unrestricted | unrestricted (guarded) | n/a — this tier has no dependency to lose |
+
+The invariants that hold in every tier (what "free" still means):
+
+1. no world writes — outside the worktree nothing is written, ever
+2. destructive scan never off (the 2026-05-15 rule; `PHEOBE_SAFE_EXEC_MODE`
+   only *loosens* the response to a deny hit under explicit choice, the
+   scan itself always runs)
+3. `paths_allow` at tool level and pre-commit
+4. git operations bounded: no protected branches, no force-push, no history
+   rewrite
+5. root jail on every path the model touches (self mode: `tools::resolve`;
+   host mode: the kit's path rule)
+
+### Self vs host
+
+- **Self mode** — pheobe's binary owns exec, so the ladder is implementable
+  directly: strict/moderate shell out to `buckets run`'s bwrap shape (same
+  argument order as bro's `sandbox.rs`, which already proved the pattern),
+  free runs the guarded subprocess. A strict-mode task that can't be
+  sandboxed fails closed with `blocked: "no_sandbox"` — the intake gate,
+  not a runtime surprise.
+- **Host mode** — pheobe *cannot* sandbox the host's own tools, so the
+  ladder becomes a **requested tier that maps to host capabilities**:
+  claude → permission modes / tool allowlists; codex → `--sandbox
+  workspace-write` (strict/moderate) vs `--sandbox danger-full-access`
+  only for explicit free; opencode → tool gating + its own permission
+  prompts. The kit states the mapping and the degradation rule: if the
+  host can't provide the requested tier, the subagent reports
+  `{ok:false, blocked:"sandbox_unavailable"}` instead of improvising.
+  `pheobe verify` as a subprocess inherits whatever sandbox the host
+  applies to bash — it needs no special casing.
+
+Non-goal (v0): wasm/cvm tiers. bro's `BwrapLevel` ladder shows the shape
+(full unshare + cap-drop, new-session + sandbox hostname) — pheobe adopts
+it if a consumer ever demands kernel-grade tiers, but for a scoped worker
+bwrap + policy is the honest ceiling.
 
 ## Tool barn
 
