@@ -40,3 +40,13 @@ If this project needs to depend on another sibling repo, use a git dependency
 or a relative `../../..` path that assumes a specific machine's directory layout. See
 `workspace-meta/FOREMAN_THREADS.md`'s "~17 box-local path-deps" entry for exactly why this
 matters — it is the single largest source of "works on my box, dies in CI" in this fleet.
+
+## 6. LOC budget — 500 soft / 1000 hard (fleet rule, emoe-workspace doctrine)
+
+Any source file over **500 LOC** is flagged for split review before further
+growth; no source file may exceed **1000 LOC** — a file that would is the
+wrong module boundary and must be split instead (moderate focused modules
+within this crate; the emoe "become a crate" clause applies to workspaces).
+This is the fleet's 1000-line file lesson (razor runtime.rs, cells librarian)
+turned a standing rule. Test code counts — split by section into
+`src/tests/` files when a suite outgrows its file.
