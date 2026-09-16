@@ -61,6 +61,36 @@ fn allowlist_flags_outside_paths() {
 }
 
 #[test]
+fn sidecar_pheobe_dir_alone_is_not_dirty() {
+    // regression (found by the PHEOBE-17 ACP smoke): a run that hands off
+    // ok with zero source edits used to look "dirty" purely because
+    // plan::save wrote `.pheobe/plan.json` — then commit() staged nothing
+    // (stage always excludes `.pheobe`) and `git commit` died with a bare
+    // "nothing to commit" exit 1. `.pheobe/` must never count as dirty.
+    let root = std::env::temp_dir().join(format!("pheobe-sidecar-{}", std::process::id()));
+    let wt = root.join("wt");
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&wt).unwrap();
+    run_git(&wt, &["init", "-q"]);
+    run_git(&wt, &["config", "user.email", "t@t"]);
+    run_git(&wt, &["config", "user.name", "t"]);
+    std::fs::write(wt.join("readme.md"), "seed").unwrap();
+    run_git(&wt, &["add", "-A"]);
+    run_git(&wt, &["commit", "-m", "root", "-q"]);
+
+    // only the sidecar exists → not dirty
+    crate::plan::save(&wt, &plan::Plan { task: "x".into(), steps: vec![] }).unwrap();
+    assert!(!crate::worktree::status_dirty(&wt).unwrap(),
+        "a tree whose only diff is .pheobe/plan.json is clean for commit purposes");
+
+    // a real source edit still counts
+    std::fs::write(wt.join("readme.md"), "edited").unwrap();
+    assert!(crate::worktree::status_dirty(&wt).unwrap());
+
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn ctx_brief_carries_the_preamble() {
     let e = crate::knowledge::Entry {
         slug: "tokio".into(),

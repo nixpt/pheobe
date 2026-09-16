@@ -14,6 +14,7 @@ pub mod llm;
 pub mod memory;
 pub mod plan;
 pub mod report;
+pub mod run;
 pub mod sandbox;
 pub mod structint;
 pub mod task;
@@ -27,5 +28,6 @@ pub mod worker_codex;
 pub mod worker_cursor;
 pub mod worker_kimi;
 pub mod worktree;
+pub mod acp;
 #[cfg(test)]
 mod tests;

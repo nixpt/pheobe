@@ -4,7 +4,7 @@
 
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
-use pheobe::{agent, checkpoint, knowledge, learn, llm, plan, report, task, verify, worker, worktree};
+use pheobe::{checkpoint, knowledge, learn, report, run, task, verify, worktree};
 use std::path::{Path, PathBuf};
 
 #[derive(Parser, Debug)]
@@ -54,6 +54,16 @@ enum Cmd {
     },
     /// Check the environment: endpoint, worktree primitives, optional tools
     Doctor,
+    /// ACP (Agent Client Protocol) server over stdio (PHEOBE-17). A dispatch
+    /// prompt carrying a pheobe task JSON starts a run; progress streams as
+    /// session/update notifications and the report JSON returns as the final
+    /// session message. The round-trip peer is `bro synapse dispatch`.
+    Acp {
+        /// Explicit stdio transport (the default) — accepted for CLI parity
+        /// with ACP peers like `bro acp --stdio`.
+        #[arg(long)]
+        stdio: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -138,119 +148,20 @@ fn run_cmd() -> Result<()> {
         Cmd::Adopt { cmd } => cmd_adopt(cmd),
         Cmd::Check { cmd } => cmd_check(cmd),
         Cmd::Doctor => cmd_doctor(),
+        Cmd::Acp { stdio: _ } => cmd_acp(),
     }
+}
+
+fn cmd_acp() -> Result<()> {
+    learn::init(); // PHEOBE_MEMORY=none|local|host selects the store (PHEOBE-16)
+    let rt = tokio::runtime::Runtime::new()?;
+    rt.block_on(pheobe::acp::serve_stdio())
 }
 
 fn cmd_run(task_file: &str, branch: Option<String>) -> Result<()> {
     learn::init(); // PHEOBE_MEMORY=none|local|host selects the store (PHEOBE-16)
     let task = task::load(task_file)?;
-    // sandbox intake gate (PHEOBE-14): an un-deliverable strict tier is a
-    // blocked:no_sandbox BEFORE the loop, never a mid-run surprise
-    let sandbox_tier_name = task.effective_sandbox()?;
-    let sandbox_tier = pheobe::sandbox::Tier::from_name(&sandbox_tier_name)?;
-    pheobe::sandbox::ensure_at_intake(&sandbox_tier)?;
-    let repo = task.resolve_repo()?;
-    let branch = branch.or(task.branch.clone()).unwrap_or_else(|| format!("pheobe/{}", task_slug(&task.task)));
-    let task_id = task_slug(&task.task);
-
-    if !task.worktree && Path::new(&repo).join(".git").is_dir() {
-        bail!(
-            "refusing to cook in the primary source checkout — set worktree:true (default) \
-             or point repo at a worktree (the source checkout is shared: mom's kitchen rule)"
-        );
-    }
-    let (wt, branch) = worktree::provision(&repo, &branch)?;
-    eprintln!("🍳 worktree: {}  branch: {branch}", wt.display());
-    let repo_str = repo.display().to_string();
-    let session = learn::begin_session(&repo, &task.task)?;
-
-    // orient: knowledge drive brief (repo-local + global drives) + learned nudges
-    let entries = knowledge::load_all(Some(&wt))?;
-    let mut brief = knowledge::brief(&entries);
-    // structural read brief (polydex, fresh index) — empty when absent/stale;
-    // skip-don't-fail, same posture as the knowledge drive
-    let structural = pheobe::structint::orient_brief(&wt);
-    if !structural.is_empty() {
-        brief.push_str(&structural);
-    }
-    // strict-tier note rides in the prompt so the model knows the bash
-    // tool is allowlist-gated and network-free
-    if sandbox_tier_name == "strict" {
-        brief.push_str(pheobe::sandbox::STRICT_NOTE);
-    }
-    let nudges = learn::nudges_for(&repo_str);
-    if !nudges.is_empty() {
-        eprintln!("📚 {} learned nudge(s) for this repo", nudges.len());
-    }
-
-    // plan file seeded; the model refines it through the loop
-    plan::save(&wt, &plan::Plan { task: task.task.clone(), steps: vec![] })?;
-
-    // the model turn, dispatched by PHEOBE_PROVIDER (PHEOBE-9):
-    //   openai (default)  → the built-in per-turn Provider loop
-    //   <worker adapter>  → one prompt out, one whole run back (PHEOBE-4..8)
-    // unknown provider → a clear error from the registry, before anything else
-    let provider_name = std::env::var("PHEOBE_PROVIDER").unwrap_or_else(|_| "openai".to_string());
-    let ttl = task.ttl.as_deref().map(pheobe::aging::parse_ttl).transpose()?;
-    let cfg = agent::LoopCfg {
-        max_turns: task.budget.as_ref().map(|b| b.max_iterations * 8).unwrap_or(60),
-        ttl,
-        max_usd: task.budget.as_ref().and_then(|b| b.max_usd),
-        usd_per_mtok: std::env::var("PHEOBE_USD_PER_MTOK").ok().and_then(|v| v.parse().ok()),
-    };
-    let outcome = match worker::worker_from_env(&provider_name)? {
-        Some(w) => agent::run_worker(w.as_ref(), &task, &wt, &task_id, &brief, &nudges, &cfg)?,
-        None => {
-            let provider = llm::OpenAi::from_env()?;
-            agent::run(&provider, &task, &wt, &task_id, &brief, &nudges, &cfg)?
-        }
-    };
-
-    // mechanical gates run after the loop and have the final word over the model
-    let mut commits = vec![];
-    let dirty = worktree::status_dirty(&wt)?;
-    if outcome.ok && dirty {
-        let (violations, byproducts) = worktree::check_allowlist(&wt, &task.paths_allow)?;
-        if !byproducts.is_empty() {
-            eprintln!("📝 bash-run byproducts (uncommitted, staged out): {}", byproducts.join(", "));
-        }
-        if !violations.is_empty() {
-            let _ = learn::end_session(session.as_ref(), "allowlist_violation", 2);
-            let rep = report::HandoffReport::failure(&task.task, &format!("paths outside paths_allow: {}", violations.join(", ")));
-            report::emit(&rep)?;
-            bail!("run blocked by allowlist violations");
-        }
-        let sha = worktree::commit(&wt, &task_id, outcome.summary.as_deref().unwrap_or(&task.task), &task.paths_allow)?;
-        commits.push(sha);
-    }
-
-    let tests = if outcome.ok || dirty {
-        Some(verify::run_done_when(&task, &wt)?)
-    } else {
-        None
-    };
-    let ok = outcome.ok && tests.as_ref().map(|t| t.passed).unwrap_or(true);
-    if !ok {
-        eprintln!("❌ done_when failed");
-    }
-    let _ = learn::end_session(session.as_ref(), if ok { "done" } else { "failed" }, if ok { 0 } else { 1 });
-
-    let rep = report::HandoffReport {
-        ok,
-        task: task.task.clone(),
-        branch: Some(branch),
-        worktree: Some(wt.display().to_string()),
-        commits,
-        tests,
-        summary: outcome.summary,
-        next_steps: outcome.next_steps,
-        doubts: outcome.doubts,
-        blocked: if ok { None } else { outcome.blocked.or(Some("done_when failed".into())) },
-        usage: Some(report::Usage { turns: outcome.usage.turns, usd: None }),
-    };
-    if task.push && ok {
-        worktree::push(&wt, rep.branch.clone().unwrap_or_default().as_str())?;
-    }
+    let rep = run::run_task(&task, branch.as_deref(), &|stage| eprintln!("{stage}"))?;
     report::emit(&rep)
 }
 
@@ -387,13 +298,4 @@ fn cmd_doctor() -> Result<()> {
 
 fn hint_ok(hint: &str) -> String {
     format!("ok ({hint})")
-}
-
-fn task_slug(t: &str) -> String {
-    t.chars()
-        .take(24)
-        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
-        .collect::<String>()
-        .trim_matches('-')
-        .to_lowercase()
 }

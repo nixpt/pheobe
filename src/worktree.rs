@@ -87,7 +87,18 @@ fn provision_buckets(repo: &Path, branch: &str) -> Result<(PathBuf, String)> {
 /// then yields `alc.py` for ` M calc.py`. Every real run's first status
 /// entry is the edited file, so this exact mangling blocked the exit gate.
 pub fn status_dirty(wt: &Path) -> Result<bool> {
-    Ok(!status_porcelain(wt)?.is_empty())
+    // `.pheobe/` is pheobe's own sidecar state (plan file, learning scrubs)
+    // and must never count as "the model changed something" — a run whose
+    // only diff is `.pheobe/plan.json` did no work and has nothing to commit.
+    Ok(status_porcelain(wt)?
+        .into_iter()
+        .filter(|line| {
+            porcelain_path(line)
+                .map(|p| !(p == ".pheobe" || p.starts_with(".pheobe/")))
+                .unwrap_or(true)
+        })
+        .next()
+        .is_some())
 }
 
 pub fn status_porcelain(wt: &Path) -> Result<Vec<String>> {
