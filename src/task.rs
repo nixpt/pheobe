@@ -87,6 +87,14 @@ pub fn load(path: &str) -> Result<Task> {
     Ok(task)
 }
 
+/// Parse task JSON from a string (the ACP dispatch path — the prompt text
+/// carries a pheobe task JSON, no file involved).
+pub fn load_from_str(raw: &str) -> Result<Task> {
+    let task: Task = serde_json::from_str(raw)?;
+    task.validate()?;
+    Ok(task)
+}
+
 impl Task {
     /// Resolve the effective sandbox tier: `PHEOBE_SANDBOX` env (always wins)
     /// → `task.sandbox` → `"moderate"` (default). Unknown tier = intake error.
