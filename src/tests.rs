@@ -10,6 +10,7 @@ mod contract;
 mod cursor;
 mod e2e;
 mod gates;
+mod host;
 mod opencode;
 mod outcome;
 mod p10;

@@ -4,8 +4,7 @@
 401 after `worktree::provision` succeeded; the worktrees
 (`pheobe/fix-the-bug-in-calc-py-a-3`, `-a-4`) remain on disk with no
 commits, consuming the branch suffix namespace.
-**Severity:** P3 — hygiene, not correctness (branch-suffix logic from
-issue 03 handles the collision correctly).
+**Status:** Done (PHEOBE-26)
 
 ## Expected behavior
 
@@ -18,3 +17,10 @@ with a `next_steps` cleanup hint.
 In `cmd_run`, wrap provision→report in a scope; on early error (model
 unreachable), `buckets worktree remove --force` the just-created worktree
 unless `PHEOBE_KEEP_WORKTREE` is set. Verify with a 401-forcing test.
+
+## Resolution
+
+PHEOBE-26: `run_task` tears down the just-provisioned worktree on `Err`
+after provision (`buckets worktree remove --force`, git fallback) unless
+`PHEOBE_KEEP_WORKTREE` is set. Covered by
+`run_task_missing_endpoint_tears_down_the_empty_worktree`.

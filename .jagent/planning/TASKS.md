@@ -9,15 +9,15 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 ## P0 — Build & Core Health
 
 - [x] `cargo build --release` clean
-- [x] `cargo test` green — 100 tests (`src/tests.rs` + per-module tests)
+- [x] `cargo test` green — 117 tests (`src/tests.rs` + per-module tests)
 - [x] `cargo clippy --all-targets -- -D warnings` + `cargo fmt --check` clean (PHEOBE-20)
 - [x] CI: `.github/workflows/ci.yml` (fmt, clippy, test, package) + release gate (PHEOBE-20)
 - [x] **issue 01** — allowlist off-by-one on the first porcelain line (Done, PHEOBE-3)
 - [x] **issue 02** — own state dir counted as an allowlist violation (Done, PHEOBE-3)
 - [x] **issue 03** — existing slug branch reused silently (Done, PHEOBE-3)
-- [ ] **issue 04** (`../issues/04-failed-model-run-leaves-empty-worktree.md`) — a run that
+- [x] **issue 04** (`../issues/04-failed-model-run-leaves-empty-worktree.md`) — a run that
       dies before the model turn (endpoint/auth failure) leaves an empty worktree + branch
-      behind. P3 hygiene.
+      behind. P3 hygiene. **Done, PHEOBE-26.**
 - [x] **issue 05** (`../issues/05-worker-route-drops-commits-the-engine-made.md`) — worker route
       reports no `commits` when the engine committed itself (found: claude adapter, s457). P2.
 - [x] **issue 06** (`../issues/06-json-tail-misses-fenced-report.md`) — a ```json-fenced handoff
@@ -50,7 +50,7 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 - [x] PHEOBE-15 — adopt-kit expansion + alignment
 - [x] PHEOBE-4 / 5 / 7 — opencode, claude, codex worker adapters (each live-smoked)
 - [x] PHEOBE-6 / 8 — cursor, kimi worker adapters
-- [x] host mode exit gate (`pheobe verify`)
+- [x] host mode exit gate (`pheobe verify`; `pheobe host setup`/`finish` as of PHEOBE-26)
 
 ## M2 — isolation, structure, memory, transport
 
@@ -67,6 +67,7 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 - [x] PHEOBE-24 — agent-sync channel: `scripts/pheobe-sync` + `docs/SYNC.md` + RULES §7
 - [x] **PHEOBE-23** — Cursor SDK/CLI alignment (`--sandbox` map, IDE agents kit, `disallowedTools` on AgentOptions)
 - [x] **PHEOBE-25** (`tickets/PHEOBE-25-agy-worker-and-adopt-kit.md`) — AGY worker adapter (`PHEOBE_PROVIDER=agy`) + adoption kit (`adopt/agy/`)
+- [x] PHEOBE-26 — host supervisor (`pheobe host setup`/`finish`) + issue 04 empty-worktree teardown
 
 ## W5 — release
 

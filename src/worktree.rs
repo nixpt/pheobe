@@ -121,6 +121,44 @@ fn provision_buckets(repo: &Path, branch: &str) -> Result<(PathBuf, String)> {
     Ok((PathBuf::from(last), branch.to_string()))
 }
 
+/// Tear down a worktree pheobe just provisioned. Used when the model turn
+/// never starts (issue 04) so empty branches do not consume the suffix
+/// namespace. `--force` is required: a fresh branch with no unique commits
+/// is still registered as a worktree.
+pub fn teardown(repo: &Path, wt: &Path, branch: &str) -> Result<()> {
+    if buckets_available() {
+        run(Command::new("buckets").args([
+            "worktree",
+            "remove",
+            &repo.display().to_string(),
+            &wt.display().to_string(),
+            branch,
+            "--force",
+        ]))?;
+        return Ok(());
+    }
+    let _ = Command::new("git")
+        .arg("-C")
+        .arg(repo)
+        .args(["worktree", "remove", "--force"])
+        .arg(wt)
+        .status();
+    let _ = Command::new("git")
+        .arg("-C")
+        .arg(repo)
+        .args(["branch", "-D", branch])
+        .status();
+    Ok(())
+}
+
+/// Operator override: leave a failed-run worktree on disk for inspection.
+pub fn keep_requested() -> bool {
+    match std::env::var("PHEOBE_KEEP_WORKTREE") {
+        Ok(v) => matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes"),
+        Err(_) => false,
+    }
+}
+
 /// `git status --porcelain` lines, RAW — no trim. Issue 01: trimming the
 /// whole output eats the leading space of the first line, and `line[3..]`
 /// then yields `alc.py` for ` M calc.py`. Every real run's first status

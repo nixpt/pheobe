@@ -4,7 +4,7 @@
 
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
-use pheobe::{checkpoint, knowledge, learn, report, run, task, verify, worktree};
+use pheobe::{checkpoint, host, knowledge, learn, report, run, task, verify, worktree};
 use std::path::{Path, PathBuf};
 
 #[derive(Parser, Debug)]
@@ -52,6 +52,11 @@ enum Cmd {
         #[command(subcommand)]
         cmd: Option<AdoptCmd>,
     },
+    /// Host-mode supervisor: provision a worktree, then gate the exit
+    Host {
+        #[command(subcommand)]
+        cmd: HostCmd,
+    },
     /// Named working-state snapshots (git-stash plumbing; create never touches the tree)
     Check {
         #[command(subcommand)]
@@ -68,6 +73,26 @@ enum Cmd {
         /// with ACP peers like `bro acp --stdio`.
         #[arg(long)]
         stdio: bool,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum HostCmd {
+    /// Intake + provision a worktree; JSON {ok, worktree, branch, task} on stdout
+    Setup {
+        /// Task file (JSON) or `-` for stdin
+        task_file: String,
+        /// Override the branch name
+        #[arg(long)]
+        branch: Option<String>,
+    },
+    /// done_when + paths_allow in the worktree; JSON {ok, tests, violations}; exit 0/1
+    Finish {
+        /// Task file (JSON) or `-` for stdin
+        task_file: String,
+        /// Working copy to gate (defaults to cwd)
+        #[arg(long)]
+        worktree: Option<String>,
     },
 }
 
@@ -161,6 +186,7 @@ fn run_cmd() -> Result<()> {
         Cmd::Check { cmd } => cmd_check(cmd),
         Cmd::Doctor => cmd_doctor(),
         Cmd::Acp { stdio: _ } => cmd_acp(),
+        Cmd::Host { cmd } => cmd_host(cmd),
     }
 }
 
@@ -206,6 +232,30 @@ fn cmd_verify(task_file: &str, worktree: Option<String>) -> Result<()> {
     }
     println!("✅ verify passed: {}", ev.ran);
     Ok(())
+}
+
+fn cmd_host(cmd: HostCmd) -> Result<()> {
+    match cmd {
+        HostCmd::Setup { task_file, branch } => {
+            let task = task::load(&task_file)?;
+            let setup = host::setup(&task, branch.as_deref())?;
+            println!("{}", serde_json::to_string_pretty(&setup)?);
+            Ok(())
+        }
+        HostCmd::Finish {
+            task_file,
+            worktree,
+        } => {
+            let task = task::load(&task_file)?;
+            let wt = host::resolve_worktree(worktree);
+            let finish = host::finish(&task, &wt)?;
+            println!("{}", serde_json::to_string_pretty(&finish)?);
+            if !finish.ok {
+                std::process::exit(1);
+            }
+            Ok(())
+        }
+    }
 }
 
 fn cmd_ctx(cmd: CtxCmd) -> Result<()> {

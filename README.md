@@ -11,13 +11,14 @@ touches the caller's checkout.
 
 ```text
 adopter ──► pheobe run task.json ──► own LLM endpoint      (self mode)
-adopter's LLM ──► pheobe protocol ──► pheobe verify task.json   (host mode)
+adopter's LLM ──► pheobe host setup/finish + protocol          (host mode)
 ```
 
 - **Self mode** — pheobe is the engine: plan → implement → verify → iterate →
   handoff on an OpenAI-shaped endpoint of your choice.
-- **Host mode** — the adopting harness's model drives; pheobe ships the loop as
-  a prompt protocol and stays around as the exit gate (`pheobe verify`).
+- **Host mode** — the adopting harness's model drives; pheobe provisions the
+  kitchen (`pheobe host setup`) and gates the exit (`pheobe host finish` /
+  `pheobe verify`).
 
 ## Install
 
@@ -77,7 +78,9 @@ no `manual` — a run never ends on vibes.
 | command | what it does |
 |---|---|
 | `pheobe run <task.json\|->` | the loop, self mode; report on stdout |
-| `pheobe verify <task.json>` | `done_when` + path-allowlist gate only; exit 0/1 (host mode's exit gate) |
+| `pheobe verify <task.json>` | `done_when` + path-allowlist gate only; exit 0/1 |
+| `pheobe host setup <task.json>` | host supervisor: intake + worktree + empty plan; JSON `{ok, worktree, branch, task}` |
+| `pheobe host finish <task.json>` | host supervisor: `done_when` + allowlist in `--worktree` (cwd default); JSON; exit 0/1 |
 | `pheobe adopt <claude\|claude-sdk\|opencode\|opencode-self\|codex\|cursor\|kimi\|agy>` | print that harness's adoption kit |
 | `pheobe acp --stdio` | Agent Client Protocol server over stdio (e.g. `bro synapse dispatch -- pheobe acp --stdio`) |
 | `pheobe ctx …` | knowledge drive: brief the prompt for a repo (`knowledge/` ships the seed corpus) |
@@ -95,6 +98,7 @@ Everything is environment-driven; there is no config file.
 | `PHEOBE_PROVIDER` | `openai` (built-in turn loop) or a worker adapter: `opencode`, `claude`, `codex`, `cursor`, `kimi`, `agy` | `openai` |
 | `PHEOBE_SANDBOX` | `strict` \| `moderate` \| `free` (bwrap tiers; env wins over the task's `sandbox`) | `moderate` |
 | `PHEOBE_MEMORY` | `none` \| `local` \| `host` (host = a joker-mcp memory store) | `local` |
+| `PHEOBE_KEEP_WORKTREE` | `1` / `true` / `yes` — leave a failed-run worktree on disk | unset (tear down on early `run` error) |
 | `PHEOBE_<PROVIDER>_BIN` / `_FLAGS` / `_TIMEOUT_SECS` | per-adapter binary, extra flags, wall-clock cap | adapter default |
 
 ## Adoption kits
