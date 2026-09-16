@@ -25,6 +25,7 @@ pub mod worker_opencode;
 pub mod worker_claude;
 pub mod worker_codex;
 pub mod worker_cursor;
+pub mod worker_kimi;
 pub mod worktree;
 #[cfg(test)]
 mod tests;
