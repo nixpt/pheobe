@@ -876,6 +876,70 @@ injects delivered via `run.steer()` at warn/narrow, `run.cancel()` on
 expiry. Plus `pheobe adopt cursor` emitting the `local.agents` def +
 hook config snippet.
 
+## Codex + Kimi integration (source-grounded)
+
+References on disk: `/workspace/external/codex-src` (openai/codex,
+sparse checkout of `sdk/python` — 5.3M),
+`/workspace/external/kimi-agent-sdk` (MoonshotAI, go/node/python — 4.1M),
+`/workspace/external/ai-sdk` (Vercel AI SDK providers + harness docs).
+
+### Codex (`openai-codex` Python SDK)
+
+Same substrate pattern as everyone else: the SDK installs a matching
+`openai-codex-cli-bin` runtime dependency — the CLI is the engine.
+Thread/turn model maps 1:1 onto pheobe's loop:
+
+- `codex.thread_start(approval_mode=, sandbox=, cwd=, model=,
+  base_instructions=, developer_instructions=)` →
+  `thread.run(task) -> TurnResult` (`final_response`, collected items,
+  **token usage**), `thread_resume` / `thread_fork` for resumable runs.
+- `Sandbox.read_only | workspace_write | full_access` — per-turn
+  overridable (`thread.run(..., sandbox=)`). **Codex has the cleanest
+  sandbox mapping of all four hosts** — codex's own filesystem-sandbox
+  presets are already a three-tier ladder.
+- `ApprovalMode.auto_review | deny_all` (src/openai_codex/
+  _approval_mode.py) — `deny_all` is the headless no-questions mode.
+
+Mapping: `PHEOBE_PROVIDER=codex` →
+`thread_start(sandbox=Sandbox.workspace_write,
+approval_mode=deny_all, cwd=<worktree>,
+base_instructions=<protocol envelope>)` → `thread.run(task)` → pheobe's
+mechanical gates + report. Tier mapping: strict/moderate =
+`workspace_write` (strict additionally with `read_only` turns when
+allowlist is tight), free = `full_access` + pheobe policy invariants;
+`deny_all` in headless, `auto_review` only when a human babysits.
+Ticketed **PHEOBE-7** (S, after PHEOBE-4).
+
+Self-mode adoption stays the bash-tool route (`adopt/codex/README.md`).
+
+### Kimi (`kimi-agent-sdk` — the cece-rs lineage)
+
+Kimi Agent SDK = thin wrappers (Go/Node/Python) over **Kimi CLI (Kimi
+Code)** reusing its config, tools, skills, MCP servers — the same Kimi
+CLI lineage cece-rs forked from. Python quickstart uses `kaos` paths and
+KAOS sandbox backends (BoxLite, E2B, Sprites — examples/python/kaos),
+which is literally the same `kaos` exec-layer name cece-rs carried into
+the fleet. Config via `KIMI_API_KEY`/`KIMI_BASE_URL`/`KIMI_MODEL_NAME` or
+a `Config` object with named providers — meaning a kimi worker adapter
+can point at any OpenAI-shaped endpoint the fleet already runs.
+Surfaces mirror claude's: worker adapter (Session/stream/approval
+handling in code), def-based subagent via Kimi Code's config, sandbox via
+KAOS backends. Ticketed **PHEOBE-8** (P3 — last of the worker quartet;
+fleet-native since cece-rs already lives here).
+
+### Vercel AI SDK harnesses — industry precedent for the `Worker` trait
+
+`/workspace/external/ai-sdk/` holds the providers page + three harness
+adapter docs (codex, claude-code, opencode). Vercel ships
+`@ai-sdk/harness` + `@ai-sdk/harness-codex|claude-code|opencode` adapters
+(experimental): a `HarnessAgent` connected to each coding agent through a
+bridge in a sandbox, streaming harness events over a WebSocket. That is
+pheobe's `Worker` trait as an ecosystem standard — validation that the
+Worker abstraction is the right seam, and a later *distribution* surface:
+pheobe could ship its own `@ai-sdk` harness adapter (like the existing
+community `opencode-sdk` provider) so any AI-SDK app can adopt pheobe.
+Distribution-level idea; ticket later, after self/host modes are live.
+
 ## Persona & skills
 
 The persona is not invented — it is mined from the people who built the
