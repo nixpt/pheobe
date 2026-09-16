@@ -69,3 +69,13 @@ Landed on `agent/nixp/PHEOBE-9-worker-trait` (2026-09-16).
   — prose tail, JSON-tail merge-only, ttl pre-call hard stop (worker not
   called), ttl mid-call overrun (result ignored), registry resolution.
   21/21 green (16 pre-existing + 5).
+
+## Resolution
+
+Merged to main (W1). `src/worker.rs`: Worker trait + WorkerOutcome +
+REGISTRY table (`worker_from_env`); `agent::run_worker` with ladder/budget
+guards before AND after the call; shared `build_prompt` extracted;
+cmd_run dispatches by PHEOBE_PROVIDER. 5 new tests (prose tail, JSON-tail
+merge-only, ttl hard-stop around the worker, mid-call overrun, registry
+errors). Deviations noted: registry is a const table (no dep), JSON-tail
+ok/blocked honored, engine USD consumed by budget guard.

@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | PHEOBE-12 |
 | **Priority** | P2 |
-| **Status** | Backlog |
+| **Status** | Done |
 | **Assignee** | unassigned |
 | **Dependencies** | none |
 | **Estimated effort** | S |
@@ -35,3 +35,13 @@ drive") — it is data work, ideal for a sub-agent.
 - [ ] Note in the ticket: the squad's `.squad/research` corpus is
       readable via `PHEOBE_CTX_EXTRA=.squad/research` — the seeding must
       not duplicate entries that already live there (check first).
+
+## Resolution
+
+Merged to main (W1). 10 entries in knowledge/ (8 language passports +
+opencode-zen + polydex-cli cutoff-gap entries). Zen contract verified
+live (70 models, bare ids, Bearer auth, FLOWNET_TOKEN_OPENCODE is not a
+Zen key); polydex surface verified from the live binary (not just
+README). No .squad/research duplication (language-implementation.md
+cited, not copied). Doctor entry-count deferred (noted). Zero src
+changes; 16 tests; ctx list shows all 10 fresh.

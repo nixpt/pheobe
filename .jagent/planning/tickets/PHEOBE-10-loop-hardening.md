@@ -64,3 +64,14 @@ Implemented on `agent/nixp/PHEOBE-10-barn` (2026-09-16), all four items,
   iteration stays a manual `pheobe check restore` — the loop has no
   mechanical notion of a failed iteration to key off (noted for the
   follow-up ticket if the host mode wants it automatic).
+
+## Resolution
+
+Merged to main (W1). src/testparse.rs (cargo/jest/pytest/go line
+scanners, no regex dep), src/fmt.rs (format-on-write table +
+PHEOBE_FORMAT=off), src/checkpoint.rs + `pheobe check create/list/
+restore/prune` (git-stash plumbing, never touches the tree on create),
+plan_tracker depends_on validation (bounded-DFS cycle detection,
+predecessor-done refusal). 13 new tests, 29 on that branch. Loop wiring:
+checkpoint-on-step-done (restore stays manual — no mechanical failed-
+iteration signal exists; documented).

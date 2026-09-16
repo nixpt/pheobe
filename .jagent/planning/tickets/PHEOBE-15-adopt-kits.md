@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | PHEOBE-15 |
 | **Priority** | P2 |
-| **Status** | Backlog |
+| **Status** | Done |
 | **Assignee** | unassigned |
 | **Dependencies** | none |
 | **Estimated effort** | S |
@@ -32,3 +32,13 @@ kimi def, and an opencode `pheobe-host.md` naming inconsistency
       trimmed to that host's column.
 - [ ] `pheobe adopt` without args prints the kit index + the shared JSON
       contract reminder.
+
+## Resolution
+
+Merged to main (W1). adopt/README.md index + shared contract reminder;
+claude sdk-snippet; opencode host-agent.md renamed to pheobe-host.md +
+jsonc snippet; codex sdk-snippet (thread_start deny_all/workspace_write);
+cursor def.md (local.agents + hooks + sandboxOptions); kimi def.md; bare
+`pheobe adopt` prints the index. main.rs diff confined to AdoptCmd. All
+kits carry their host's sandbox column + degradation rule. 9 adopt forms
+verified non-empty.
