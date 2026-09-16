@@ -24,6 +24,7 @@ pub mod testparse;
 #[cfg(test)]
 mod tests;
 pub mod tools;
+pub mod update;
 pub mod verify;
 pub mod worker;
 pub mod worker_agy;

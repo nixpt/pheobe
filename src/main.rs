@@ -4,7 +4,7 @@
 
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
-use pheobe::{checkpoint, host, knowledge, learn, report, run, task, verify, worktree};
+use pheobe::{checkpoint, host, knowledge, learn, report, run, task, update, verify, worktree};
 use std::path::{Path, PathBuf};
 
 #[derive(Parser, Debug)]
@@ -392,6 +392,7 @@ fn cmd_check(cmd: CheckCmd) -> Result<()> {
 }
 
 fn cmd_doctor() -> Result<()> {
+    println!("{:14} {}", "pheobe:", update::current().line());
     let endpoint =
         std::env::var("PHEOBE_BASE_URL").is_ok() && std::env::var("PHEOBE_MODEL").is_ok();
     println!(

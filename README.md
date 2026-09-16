@@ -86,7 +86,7 @@ no `manual` — a run never ends on vibes.
 | `pheobe ctx seed` / `ctx brief --for-repo <dir>` / `ctx list` | knowledge drive: land the built-in corpus in `~/.pheobe/knowledge`, then brief the prompt with the entries that match a repo |
 | `pheobe learn …` | closed-loop lesson store |
 | `pheobe check …` | named working-state snapshots |
-| `pheobe doctor` | endpoint, worktree primitives, optional tools |
+| `pheobe doctor` | version vs crates.io/github tags, endpoint, knowledge drive, worktree primitives |
 
 ## Configuration
 
