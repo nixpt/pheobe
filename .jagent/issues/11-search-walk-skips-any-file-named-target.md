@@ -30,3 +30,10 @@ PHEOBE-35 pins this current behavior in tests without changing the walk implemen
 
 When addressing this issue: only skip when `p.is_dir() && name.starts_with("target")`,
 or check `name == "target" || (p.is_dir() && name.starts_with("target"))`.
+
+## Resolution
+
+Resolved in PHEOBE-37:
+- Changed `walk()` filter to `if name == ".git" || name == "node_modules" || (is_dir && name.starts_with("target"))`.
+- Updated test `search_walk_includes_files_starting_with_target_issue_11` in `src/tests/search.rs` to verify that regular files starting with `target` (`target.rs`, `targeting.py`) are searched while directories starting with `target` (`target-build/`) continue to be skipped.
+

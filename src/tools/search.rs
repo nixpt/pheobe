@@ -40,11 +40,12 @@ fn walk(dir: &Path, depth: usize, f: &mut dyn FnMut(&Path) -> bool) -> bool {
     entries.sort_by_key(|e| e.file_name());
     for e in entries {
         let p = e.path();
+        let is_dir = p.is_dir();
         let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        if name == ".git" || name.starts_with("target") || name == "node_modules" {
+        if name == ".git" || name == "node_modules" || (is_dir && name.starts_with("target")) {
             continue;
         }
-        if p.is_dir() {
+        if is_dir {
             if !walk(&p, depth + 1, f) {
                 return false;
             }
