@@ -14,6 +14,7 @@ pub mod report;
 pub mod task;
 pub mod tools;
 pub mod verify;
+pub mod worker;
 pub mod worktree;
 
 #[cfg(test)]
