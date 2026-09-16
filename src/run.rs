@@ -76,7 +76,7 @@ fn run_after_provision(
 
     // orient: knowledge drive brief (repo-local + global drives) + learned nudges
     let entries = knowledge::load_all(Some(wt))?;
-    let mut brief = knowledge::brief(&entries);
+    let mut brief = knowledge::brief(&entries, Some(wt));
     // structural read brief (polydex, fresh index) — empty when absent/stale;
     // skip-don't-fail, same posture as the knowledge drive
     let structural = structint::orient_brief(wt);

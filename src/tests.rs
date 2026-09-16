@@ -11,6 +11,7 @@ mod cursor;
 mod e2e;
 mod gates;
 mod host;
+mod knowledge;
 mod opencode;
 mod outcome;
 mod p10;
