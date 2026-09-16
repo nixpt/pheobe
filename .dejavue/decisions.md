@@ -59,3 +59,11 @@ Artifacts: scripts/pheobe-sync, docs/SYNC.md
 
 Author type: orchestrator
 
+
+## 2026-09-16T16:30:08-05:00 — [STRATEGIC] [VERIFIED] [OPERATIONAL] crates.io publishing is OIDC-only
+
+Reason:
+Trusted Publishing configured on the pheobe crate for nixpt/pheobe publish.yml and proven with the verify_auth dispatch (2026-09-16); the CARGO_REGISTRY_TOKEN repo secret was deleted. A future token is only needed for a first publish of a NEW crate.
+
+Author type: orchestrator
+
