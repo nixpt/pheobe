@@ -22,8 +22,7 @@ Source of truth for scope is `DESIGN.md`. This file only tracks sequencing.
 
 ## M3 — fidelity and proof (current)
 
-- PHEOBE-34 CLI contract tests (main.rs is 0% covered); PHEOBE-35 barn search tool tests (14%)
-- issue 10 ETXTBSY flake; kimi adapter live run; native claude host kit; sandbox-tier mapping table
+- PHEOBE-34/35 coverage tickets; issue 10 ETXTBSY closed (PHEOBE-38); issue 11 walker fix (PHEOBE-37); kimi adapter live run; native claude host kit; sandbox-tier mapping table
 - Closed-loop learning store graduated from opt-in (`learn.rs`, `PHEOBE_MEMORY=host` proven beyond joker-mcp)
 - In-process SDK workers where a harness needs them (cursor `run.steer()` / `getUsage()`) — a `Worker` trait extension, not a rewrite
 

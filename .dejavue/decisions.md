@@ -77,3 +77,13 @@ Rejected alternatives:
 - **unit tests that look up target/debug/pheobe by PATH**: PATH-dependent and misses the cargo-provided bin env
 - **tests/cli.rs at the crate root**: works, but the ticket pinned src/tests/cli.rs
 
+
+## 2026-09-16T17:29:53-05:00 — Shim writers use tmp+chmod+rename, not in-place write
+
+Reason:
+ETXTBSY happens when execve hits an inode still open for write. Writing a sibling tmp and renaming onto the dest means the dest inode is never a write-fd, so a parallel test's fork cannot busy the file being exec'd. Retry on errno 26 is belt-and-suspenders at spawn.
+
+Rejected alternatives:
+- **spawn through sh <path>**: changes argv[0] and would hide missing +x
+- **serialize all adapter tests**: slower than the race is rare
+

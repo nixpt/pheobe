@@ -24,16 +24,7 @@ fn scratch(name: &str) -> std::path::PathBuf {
 }
 
 fn fake_agy(dir: &std::path::Path, name: &str, body: &str) -> std::path::PathBuf {
-    let path = dir.join(name);
-    std::fs::write(&path, format!("#!/bin/sh\n{body}")).unwrap();
-    let mut perms = std::fs::metadata(&path).unwrap().permissions();
-    #[allow(clippy::permissions_set_readonly_false)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        perms.set_mode(0o755);
-    }
-    std::fs::set_permissions(&path, perms).unwrap();
-    path
+    crate::tests::write_shim(dir, name, body)
 }
 
 fn capture_agy(

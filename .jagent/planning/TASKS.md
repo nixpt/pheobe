@@ -9,7 +9,7 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 ## P0 — Build & Core Health
 
 - [x] `cargo build --release` clean
-- [x] `cargo test` green — 157 tests (`src/tests.rs` + `[[test]]` cli + per-module tests)
+- [x] `cargo test` green — 177 tests (`src/tests.rs` + `[[test]]` cli + per-module tests)
 - [x] `cargo clippy --all-targets -- -D warnings` + `cargo fmt --check` clean (PHEOBE-20)
 - [x] CI: `.github/workflows/ci.yml` (fmt, clippy, test, package) + release gate (PHEOBE-20)
 - [x] **issue 01** — allowlist off-by-one on the first porcelain line (Done, PHEOBE-3)
@@ -28,8 +28,8 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
       gives the host no reason on a done_when failure. P3.
 - [x] **issue 09** (`../issues/09-byproduct-only-dirty-tree-fails-the-commit-gate.md`) — a tree dirty
       only from byproducts killed the run with an empty error (Done, PHEOBE-22).
-- [ ] **issue 10** (`../issues/10-shim-exec-etxtbsy-race-in-parallel-tests.md`) — adapter tests can
-      hit ETXTBSY when a parallel test forks mid-shim-write; poisoned PATH_LOCK once (now tolerated). P3. **→ cursor** (captain, 2026-09-16)
+- [x] **issue 10** (`../issues/10-shim-exec-etxtbsy-race-in-parallel-tests.md`) — adapter tests can
+      hit ETXTBSY when a parallel test forks mid-shim-write (Done, PHEOBE-37).
 - [ ] **issue 11** (`../issues/11-search-walk-skips-any-file-named-target.md`) — `search::walk` skips any *file* named
       `target*`, not just build dirs (found + pinned in PHEOBE-35). **→ agy** (captain, 2026-09-16)
 - [x] kit drift found s457 (Done, PHEOBE-22): `adopt/claude/self-agent.md` runs `pheobe run <file> --json` (no such
@@ -88,6 +88,7 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 - [x] **PHEOBE-35** (`tickets/PHEOBE-35-search-tool-tests.md`) — barn `search`/`structural` tool tests; `tools/search.rs` 14% → ≥ 80%. Done (agy).
 - [x] PHEOBE-36 — `.jagent/` refreshed: PROJECT.md (public repo, crate, channel), STATE.md (M2 done, coverage, open items), ROADMAP (M0–M2 ✅, M3 current)
 - [x] **PHEOBE-37** (`tickets/PHEOBE-37-fix-search-walk-target-files.md`) — fix `search::walk` skipping files starting with "target" (issue 11). Done (agy).
+- [x] **PHEOBE-38** (`tickets/PHEOBE-38-etxtbsy-shim-write.md`) — issue 10: `write_shim` tmp+rename + worker spawn retry on ETXTBSY.
 - coverage (cargo-llvm-cov, 2026-09-16, PHEOBE-34): 83.16% lines / 81.05% regions / 79.21% functions (`main.rs` 80.91%; was 79.31% / `main.rs` 0%)
 - [x] PHEOBE-31 — `pheobe doctor` prints compiled version vs crates.io / github tags
 - [x] PHEOBE-32 — `pheobe update` (`cargo install pheobe --locked --force`; git fallback) — shipped as 0.3.0

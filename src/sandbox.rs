@@ -224,13 +224,7 @@ mod tests {
     }
 
     fn fake_bin(dir: &Path, name: &str) -> PathBuf {
-        let path = dir.join(name);
-        std::fs::write(&path, "#!/bin/sh\necho fake-bwrap").unwrap();
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = std::fs::metadata(&path).unwrap().permissions();
-        perms.set_mode(0o755);
-        std::fs::set_permissions(&path, perms).unwrap();
-        path
+        crate::tests::write_shim(dir, name, "echo fake-bwrap\n")
     }
 
     #[test]
@@ -291,7 +285,7 @@ mod tests {
     #[test]
     fn strict_without_bwrap_fails_closed() {
         let dir = scratch("no-bwrap");
-        let _lock = PATH_LOCK.lock().unwrap();
+        let _lock = PATH_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let real_path = std::env::var("PATH").unwrap_or_default();
         // empty PATH = no bwrap
         let empty = dir.join("empty");
@@ -310,7 +304,7 @@ mod tests {
     #[test]
     fn strict_with_bwrap_returns_a_spawnable_command() {
         let dir = scratch("fake-bwrap");
-        let _lock = PATH_LOCK.lock().unwrap();
+        let _lock = PATH_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let real_path = std::env::var("PATH").unwrap_or_default();
         fake_bin(&dir, "bwrap");
         unsafe { std::env::set_var("PATH", format!("{}:{real_path}", dir.display())) };
@@ -344,7 +338,7 @@ mod tests {
 
     #[test]
     fn effective_sandbox_env_overrides_task_value() {
-        let _lock = PATH_LOCK.lock().unwrap();
+        let _lock = PATH_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let task = crate::task::Task {
             task: "test".into(),
             done_when: crate::task::DoneWhen::Command {

@@ -65,7 +65,7 @@ impl Worker for ClaudeWorker {
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
 
-        let mut child = cmd.spawn().with_context(|| {
+        let mut child = crate::worker::spawn_retry(&mut cmd).with_context(|| {
             format!(
                 "claude worker: failed to spawn '{bin}' (is the claude binary on PATH? \
                  set PHEOBE_CLAUDE_BIN to override)"

@@ -32,22 +32,15 @@ fn env_root(tag: &str) -> std::path::PathBuf {
 fn fake_bin(dir: &Path, name: &str, stream: &str) -> std::path::PathBuf {
     let argv_out = dir.join("argv.txt");
     let cwd_out = dir.join("cwd.txt");
-    let script = dir.join(name);
-    std::fs::write(
-        &script,
-        format!(
-            "#!/bin/sh\nprintf '%s\\n' \"$@\" > {argv}\npwd > {cwd}\ncat <<'PHEOBE_STREAM_EOF'\n{stream}\nPHEOBE_STREAM_EOF\n",
+    crate::tests::write_shim(
+        dir,
+        name,
+        &format!(
+            "printf '%s\\n' \"$@\" > {argv}\npwd > {cwd}\ncat <<'PHEOBE_STREAM_EOF'\n{stream}\nPHEOBE_STREAM_EOF\n",
             argv = argv_out.display(),
             cwd = cwd_out.display(),
         ),
     )
-    .unwrap();
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
-    }
-    script
 }
 
 /// Canned stream: two assistant text parts (last wins) + two step_finish
@@ -78,7 +71,7 @@ fn opencodew(bin_path: &Path) -> OpenCodeWorker {
 /// one positional, and the child's cwd is the worktree.
 #[test]
 fn opencode_argv_shape_cwd_and_prompt_position() {
-    let _g = ENV_LOCK.lock().unwrap();
+    let _g = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let dir = env_root("argv");
     let wt = dir.join("wt");
     std::fs::create_dir_all(&wt).unwrap();
@@ -123,7 +116,7 @@ fn opencode_argv_shape_cwd_and_prompt_position() {
 /// step_finish events: 100+50+10+20+5 + 200+60+0+30+0 = 475, $0.15.
 #[test]
 fn opencode_final_text_and_usage_summed() {
-    let _g = ENV_LOCK.lock().unwrap();
+    let _g = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let dir = env_root("parse");
     let wt = dir.join("wt");
     std::fs::create_dir_all(&wt).unwrap();
@@ -144,7 +137,7 @@ fn opencode_final_text_and_usage_summed() {
 /// tail merges ONLY summary/next_steps/doubts into the handoff report.
 #[test]
 fn opencode_run_worker_envelope_prompt_and_json_tail_normalization() {
-    let _g = ENV_LOCK.lock().unwrap();
+    let _g = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let dir = env_root("run-worker");
     let wt = dir.join("wt");
     std::fs::create_dir_all(&wt).unwrap();
@@ -188,7 +181,7 @@ fn opencode_run_worker_envelope_prompt_and_json_tail_normalization() {
 /// PHEOBE_OPENCODE_MODEL → `-m`, PHEOBE_OPENCODE_URL → `--attach`.
 #[test]
 fn opencode_env_overrides_bin_model_and_attach() {
-    let _g = ENV_LOCK.lock().unwrap();
+    let _g = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let dir = env_root("overrides");
     let wt = dir.join("wt");
     std::fs::create_dir_all(&wt).unwrap();
@@ -217,7 +210,7 @@ fn opencode_env_overrides_bin_model_and_attach() {
 /// concurrent git subprocesses still resolve).
 #[test]
 fn opencode_default_bin_resolves_via_path() {
-    let _g = ENV_LOCK.lock().unwrap();
+    let _g = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let dir = env_root("path");
     let wt = dir.join("wt");
     std::fs::create_dir_all(&wt).unwrap();
@@ -237,17 +230,11 @@ fn opencode_default_bin_resolves_via_path() {
 /// is actually killed (error, not a hang).
 #[test]
 fn opencode_timeout_override_kills_the_child() {
-    let _g = ENV_LOCK.lock().unwrap();
+    let _g = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let dir = env_root("timeout");
     let wt = dir.join("wt");
     std::fs::create_dir_all(&wt).unwrap();
-    let script = dir.join("opencode");
-    std::fs::write(&script, "#!/bin/sh\nsleep 30\n").unwrap();
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
-    }
+    let script = crate::tests::write_shim(&dir, "opencode", "sleep 30\n");
     unsafe { std::env::set_var("PHEOBE_OPENCODE_BIN", &script) };
     unsafe { std::env::set_var("PHEOBE_OPENCODE_TIMEOUT_SECS", "1") };
     let w = OpenCodeWorker::from_env().unwrap();
@@ -263,7 +250,7 @@ fn opencode_timeout_override_kills_the_child() {
 /// A missing binary produces a clear, actionable error.
 #[test]
 fn opencode_binary_not_found_error_is_clear() {
-    let _g = ENV_LOCK.lock().unwrap();
+    let _g = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let dir = env_root("notfound");
     let wt = dir.join("wt");
     std::fs::create_dir_all(&wt).unwrap();

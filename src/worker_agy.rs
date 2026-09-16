@@ -78,7 +78,7 @@ impl Worker for AgyWorker {
         cmd.stdout(std::process::Stdio::piped());
         cmd.stderr(std::process::Stdio::piped());
 
-        let mut child = cmd.spawn().with_context(|| {
+        let mut child = crate::worker::spawn_retry(&mut cmd).with_context(|| {
             format!(
                 "agy worker: failed to spawn '{bin}' (is the agy binary on PATH? \
                  set PHEOBE_AGY_BIN to override)"

@@ -24,23 +24,19 @@ impl FakeClaude {
         std::fs::create_dir_all(&dir).unwrap();
         let stdout_path = dir.join("stdout.txt");
         std::fs::write(&stdout_path, stdout).unwrap();
-        let script = dir.join("fake-claude");
         let stdout_ref = stdout_path.display().to_string();
-        std::fs::write(
-            &script,
-            format!(
-                r#"#!/bin/sh
-for a in "$@"; do printf '%s\n' "$a" >> "$PHEOBE_FAKE_ARGV"; done
+        let script = super::write_shim(
+            &dir,
+            "fake-claude",
+            &format!(
+                r#"for a in "$@"; do printf '%s\n' "$a" >> "$PHEOBE_FAKE_ARGV"; done
 pwd >> "$PHEOBE_FAKE_ARGV"
 if [ -n "$PHEOBE_FAKE_SLEEP" ]; then sleep "$PHEOBE_FAKE_SLEEP"; fi
 cat "{stdout_ref}"
 if [ -n "$PHEOBE_FAKE_EXIT" ]; then echo "fake claude exploded" >&2; exit "$PHEOBE_FAKE_EXIT"; fi
 "#
             ),
-        )
-        .unwrap();
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+        );
         FakeClaude { dir, script }
     }
 
