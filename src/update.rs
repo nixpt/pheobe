@@ -198,13 +198,23 @@ pub fn should_install(status: &Status, force: bool) -> Result<bool> {
     Ok(status.update_available())
 }
 
+/// Exit code for `pheobe update --check`: 1 if behind or the channel is
+/// unreachable (a silent 0 would look like "already current").
+pub fn check_exit_code(status: &Status) -> i32 {
+    if status.unreachable || status.update_available() {
+        1
+    } else {
+        0
+    }
+}
+
 /// Doctor-identical probe, then optionally `cargo install`. Returns the
-/// process exit code for `--check` (1 = update available).
+/// process exit code for `--check` (1 = update available or unreachable).
 pub fn run(check_only: bool, force: bool) -> Result<i32> {
     let status = current();
     println!("{:14} {}", "pheobe:", status.line());
     if check_only {
-        return Ok(if status.update_available() { 1 } else { 0 });
+        return Ok(check_exit_code(&status));
     }
     if !should_install(&status, force)? {
         if status.remote.is_none() {

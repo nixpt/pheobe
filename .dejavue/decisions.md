@@ -67,3 +67,13 @@ Trusted Publishing configured on the pheobe crate for nixpt/pheobe publish.yml a
 
 Author type: orchestrator
 
+
+## 2026-09-16T17:02:32-05:00 — CLI contract tests are a Cargo [[test]] target under src/tests/cli.rs
+
+Reason:
+env!(CARGO_BIN_EXE_pheobe) is only injected for integration tests and benches, not #[cfg(test)] modules, so cli.rs cannot be mod cli in tests.rs. A [[test]] path keeps the file next to the rest of the suite while still spawning the real binary.
+
+Rejected alternatives:
+- **unit tests that look up target/debug/pheobe by PATH**: PATH-dependent and misses the cargo-provided bin env
+- **tests/cli.rs at the crate root**: works, but the ticket pinned src/tests/cli.rs
+

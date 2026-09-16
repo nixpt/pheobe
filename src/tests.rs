@@ -1,6 +1,9 @@
 //! Contract + integration tests, split by suite area (PHEOBE-21 LOC
 //! budget): each section lives in its own file under `src/tests/`; shared
 //! harness helpers (git runner, env knobs, repo fixture) live here.
+//!
+//! `cli.rs` is a Cargo `[[test]]` target (spawns `CARGO_BIN_EXE_pheobe`),
+//! not a submodule here.
 
 mod agent_loop;
 mod aging;

@@ -16,6 +16,13 @@ exclude = [".jagent", ".github", "scripts", ".gitignore", "docs", ".dejavue", ".
 name = "pheobe"
 path = "src/main.rs"
 
+# CARGO_BIN_EXE_* is injected for integration tests, not `#[cfg(test)]`
+# modules. This file sits with the rest of the suite under src/tests/ but
+# is its own target — do not `mod cli` from tests.rs.
+[[test]]
+name = "cli"
+path = "src/tests/cli.rs"
+
 [dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["derive", "env"] }

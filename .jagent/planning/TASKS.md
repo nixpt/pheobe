@@ -9,7 +9,7 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 ## P0 — Build & Core Health
 
 - [x] `cargo build --release` clean
-- [x] `cargo test` green — 148 tests (`src/tests.rs` + per-module tests)
+- [x] `cargo test` green — 157 tests (`src/tests.rs` + `[[test]]` cli + per-module tests)
 - [x] `cargo clippy --all-targets -- -D warnings` + `cargo fmt --check` clean (PHEOBE-20)
 - [x] CI: `.github/workflows/ci.yml` (fmt, clippy, test, package) + release gate (PHEOBE-20)
 - [x] **issue 01** — allowlist off-by-one on the first porcelain line (Done, PHEOBE-3)
@@ -82,10 +82,10 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 
 ## M3 — fidelity and proof
 
-- [ ] **PHEOBE-34** (`tickets/PHEOBE-34-cli-contract-tests.md`) — CLI contract tests driving the real binary; `main.rs` 0% → ≥ 70%. **Open for pickup** — claim on the channel.
+- [x] **PHEOBE-34** (`tickets/PHEOBE-34-cli-contract-tests.md`) — CLI contract tests driving the real binary; `main.rs` 80.91%, total 83.16% (was 79.31%).
 - [ ] **PHEOBE-35** (`tickets/PHEOBE-35-search-tool-tests.md`) — barn `search`/`structural` tool tests; `tools/search.rs` 14% → ≥ 80%. **Open for pickup** — claim on the channel.
 - [x] PHEOBE-36 — `.jagent/` refreshed: PROJECT.md (public repo, crate, channel), STATE.md (M2 done, coverage, open items), ROADMAP (M0–M2 ✅, M3 current)
-- coverage baseline (cargo-llvm-cov, 2026-09-16): 79.31% lines / 77.69% regions / 75.84% functions
+- coverage (cargo-llvm-cov, 2026-09-16, PHEOBE-34): 83.16% lines / 81.05% regions / 79.21% functions (`main.rs` 80.91%; was 79.31% / `main.rs` 0%)
 - [x] PHEOBE-31 — `pheobe doctor` prints compiled version vs crates.io / github tags
 - [x] PHEOBE-32 — `pheobe update` (`cargo install pheobe --locked --force`; git fallback) — shipped as 0.3.0
 - [x] crates.io Trusted Publishing configured (captain, 2026-09-16), proven via `publish.yml verify_auth`; `CARGO_REGISTRY_TOKEN` secret deleted — publish.yml runs on OIDC only
