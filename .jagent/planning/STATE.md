@@ -6,8 +6,12 @@
 **Branch:** `main` — PHEOBE-1 (model turn), PHEOBE-2 (aging ladder), PHEOBE-3
 (all three field defects fixed, issues 01-03 closed) merged; designs for
 sandbox ladder + loops/graphs + host integrations (opencode/claude/codex/
-cursor/kimi/ai-sdk) landed. Verified live 2026-09-16 (foreman s456, Zen,
-3 models); exit-gate defects fixed on main — PHEOBE-13 re-verifies in the field.
+cursor/kimi/ai-sdk) landed. Verified live 2026-09-16 twice: foreman s456 (Zen, 3 models — exit-gate
+defects found), then W0 dogfood (PHEOBE-13) on fixed main: deepseek-v4-pro
+(5 turns), kimi-k2.6 (8), glm-5.2 (6) — all `ok:true`, one `calc.py`-only
+commit each with Pheobe-Task trailer, aging hard-stop and vague-ask
+rejection verified live. Issue 04 filed (failed model run leaves empty
+worktree).
 
 ## Wave plan (sub-agent-ready batches)
 
