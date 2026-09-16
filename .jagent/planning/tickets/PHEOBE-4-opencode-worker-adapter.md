@@ -7,7 +7,7 @@
 | **Status** | Backlog |
 | **Phase** | M0 — the loop exists; exit gate must pass a real run |
 | **Assignee** | unassigned |
-| **Dependencies** | none (PHEOBE-1/2/3 landed on main) |
+| **Dependencies** | PHEOBE-9 (Worker trait) |
 | **Estimated effort** | M |
 
 ## Problem

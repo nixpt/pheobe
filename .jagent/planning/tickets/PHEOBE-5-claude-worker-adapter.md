@@ -27,7 +27,7 @@ SDK is the CLI wrapped), `claude-agent-sdk-typescript` (0.3.273),
 
 - [ ] `PHEOBE_PROVIDER=claude` routes the turn loop to
       `claude -p <protocol+task> --output-format text <flags>` via the
-      `Worker` trait (from PHEOBE-4), mockable at the same seam.
+      `Worker` trait (from PHEOBE-9), mockable at the same seam.
 - [ ] Env: `PHEOBE_CLAUDE_BIN` (default `claude`),
       `PHEOBE_CLAUDE_FLAGS` (default `--dangerously-skip-permissions`).
 - [ ] Aging ladder enforced around the subprocess: TTL expiry kills the

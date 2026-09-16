@@ -3,7 +3,22 @@
 **Updated:** 2026-09-16
 **Milestone focus:** M0 — the loop exists; exit gate must pass a real run
 
-**Branch:** `main` (PHEOBE-2 in flight on `agent/nixp/PHEOBE-2`)
-**Verified live:** 2026-09-16 — `pheobe run` against OpenCode Zen (`https://opencode.ai/zen/v1`)
-with `deepseek-v4-pro`, `kimi-k2.6`, `glm-5.2`: model turn + tool loop correct on all three,
-every run then blocked by the allowlist gate (issues 01/02).
+**Branch:** `main` — PHEOBE-1 (model turn), PHEOBE-2 (aging ladder), PHEOBE-3
+(all three field defects fixed, issues 01-03 closed) merged; designs for
+sandbox ladder + loops/graphs + host integrations (opencode/claude/codex/
+cursor/kimi/ai-sdk) landed. Verified live 2026-09-16 (foreman s456, Zen,
+3 models); exit-gate defects fixed on main — PHEOBE-13 re-verifies in the field.
+
+## Wave plan (sub-agent-ready batches)
+
+| wave | tickets | runs-in-parallel? | notes |
+|---|---|---|---|
+| W0 | PHEOBE-13 (dogfood Zen, P0) | solo | field-verify the fixed exit gate before anything else |
+| W1 | PHEOBE-9 (Worker trait) + PHEOBE-10 (barn hardening) + PHEOBE-12 (knowledge seed) + PHEOBE-15 (adopt kits) | yes — disjoint files (worker.rs / tools.rs / knowledge/ / adopt/) | four parallel sub-agents |
+| W2 | PHEOBE-4, 5, 7 (opencode, claude, codex adapters) | yes (each against PHEOBE-9's trait) | S+S+M effort; one sub-agent each |
+| W3 | PHEOBE-14 (sandbox impl) + PHEOBE-11 (structural ladder) + PHEOBE-6 (cursor adapter) | yes | independent surfaces |
+| W4 | PHEOBE-8 (kimi) + PHEOBE-16 (memory swap) + PHEOBE-17 (acp) | mostly | 16 touches learn.rs which 8 may read |
+| W5 | PHEOBE-18 (release posture) | solo | after dogfood + quartet |
+
+RULES.md applies recursively: new defects found during any wave get their
+own issue; tickets' `Status` flips with a `## Resolution` section.
