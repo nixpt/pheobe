@@ -1,0 +1,577 @@
+# pheobe — Design
+
+> A coding workhorse with no face. Task in, worktree branch out.
+
+**Status:** design doc — no code yet. Scaffold after the contract below is ratified.
+
+## Problem
+
+The workspace has two shapes of agent and a gap between them:
+
+- **bro / cece-rs** — full agent harnesses with faces: TUIs, personas, CNS/organ
+  layers, fleet planes, ACP servers for humans. Great when a human drives.
+  Heavy when another *agent* just needs a scoped piece of engineering done.
+- **mayfly** — a policy wrapper around *other* harnesses. Owns task validation,
+  TTL, and teardown, but has no loop of its own; it delegates all thinking to
+  a spawned cursor/claude/codex process and watches.
+
+What is missing: **a real agent loop that is headless end-to-end** — no TUI,
+no server, no session store — whose whole lifecycle is designed around being
+*adopted as a subagent* by any harness (opencode, codex, claude, bro) or by a
+horse/foreman. One binary: task in, branch + report out.
+
+## Position in the stack
+
+```
+captain / human
+      │
+  foreman / horse            ← multi-step, personas, merge waves
+      │
+  pheobe                     ← THIS — scoped coding task, own loop, own worktree
+      │
+  kitchen / buckets worktree ← isolation + commit + handoff primitive
+```
+
+And from the side of the adopting harness:
+
+```
+opencode agent def ┐
+claude subagent md ┤
+codex bash tool    ┤   self mode:  pheobe run --task <…> --json ──► handoff report
+bro synapse        ┤   host mode:  kit prompt runs on the adopter's own LLM; pheobe verify gates the exit
+any shell          ┘
+```
+
+pheobe is a peer to mayfly, not a replacement: mayfly wraps *harnesses*;
+pheobe *is* the worker a harness can adopt. mayfly can later grow a
+`harness: "pheobe"` id and spawn pheobe like any other runner — the task
+schemas are deliberately kept compatible in spirit.
+
+## Core rules
+
+1. **Own loop.** pheobe plans, implements, tests, debugs, and verifies itself.
+   It never asks its parent mid-task; it reports at the end or on failure.
+2. **No face.** No TUI, no daemon, no HTTP server. Stdio and exit codes only.
+   (ACP stdio is the one exception — it *is* stdio.)
+3. **Never cooks in the parent's kitchen.** All work happens in a worktree
+   (`kitchen enter` / `buckets worktree`), on a fresh branch. The parent's
+   checkout is never touched.
+4. **Handoff is structured.** The stable contract is a JSON report on stdout.
+   Branch name, worktree path, test results, summary, next steps.
+5. **Scoped by construction.** One task per run. No recursive spawning of
+   agents. Same fuzziness gate mayfly uses: vague asks die at intake.
+6. **Persona and skills are data, not code.** A persona file + skills dir
+   shape its behavior; a repo can override them via `.pheobe/`.
+7. **Two execution modes, one contract.** The loop can be driven by pheobe's
+   own binary + endpoint (`self` mode), or by the adopting harness's own LLM
+   (`host` mode, mayfly-style inversion — see "Execution modes"). The JSON
+   handoff report and the loop stages are identical in both.
+
+## The loop
+
+```
+intake → orient → plan → implement → verify → iterate → commit → handoff
+```
+
+| stage | what happens |
+|---|---|
+| intake | parse task JSON / args; run the fuzziness gate; refuse vague asks |
+| orient | read the relevant files (grep/glob/symbols), `dejavue context` boot packet if `.dejavue/` exists, read AGENTS/CLAUDE.md conventions |
+| plan | produce a step list; persist to `.pheobe/plan.json`; expose it as a live todo tool so steps get checked off as done |
+| implement | edit files inside the worktree; formatter runs after write/edit (bro's BRO-93 pattern) |
+| verify | run the task's tests / build / lints; add tests when the task warrants them |
+| iterate | on failure: debug, amend plan, retry — bounded by budget/max iterations |
+| commit | conventional commit(s) on the worktree branch |
+| handoff | push branch (optional), emit JSON report, exit 0/1 |
+
+The loop is a plain turn loop (uno `step()`-shaped, see below) — no
+interactive state machine, no session resume. A pheobe run that dies is
+re-run from scratch; the plan file is the only durable intermediate state.
+
+## Task schema (v0)
+
+```json
+{
+  "task": "Add --json output to `foo report` and cover it with a test",
+  "done_when": {
+    "type": "command",
+    "run": "cargo test -p foo report -- --exact",
+    "expect_exit": 0
+  },
+  "repo": "/path/to/repo",
+  "worktree": true,
+  "branch": "pheobe/foo-json",
+  "ttl": "45m",
+  "budget": { "max_iterations": 8, "max_usd": 1.0 },
+  "paths_allow": ["src/report.rs", "tests/"],
+  "push": false
+}
+```
+
+- `done_when` reuses mayfly's kinds (`command`, `files_exist`,
+  `git_diff_matches`; `manual` stays forbidden). It is the verify stage's
+  success oracle, not just a watcher's exit condition — pheobe *drives*
+  toward it rather than polling it.
+- `worktree: true` (default) shells out to `kitchen` when present, else
+  `buckets worktree`; falls back to a plain `git worktree add` if neither is
+  on PATH. Never edits the given repo's checkout (same warning mayfly emits).
+- `paths_allow` is enforced at intake (plan must only touch allowed paths)
+  and again pre-commit.
+
+## Handoff report (the stable contract)
+
+```json
+{
+  "ok": true,
+  "task": "…",
+  "branch": "pheobe/foo-json",
+  "worktree": "/path/to/repo-pheobe/foo-json",
+  "commits": ["abc1234 …"],
+  "tests": { "ran": "cargo test -p foo report", "passed": true },
+  "summary": "Added --json flag to report; covered by tests/report_json.rs",
+  "next_steps": ["foreman: ready for review/merge of pheobe/foo-json"],
+  "doubts": ["assumed serde 1.x derive API — no ctx entry for serde; read from vendored source"],
+  "usage": { "turns": 14, "usd": 0.42 }
+}
+```
+
+Adopting harnesses should only ever consume this shape. Everything else
+(dialogue, tool calls, plan churn) is logging on stderr / `.pheobe/`.
+
+## Execution modes
+
+The loop stages, worktree isolation, and handoff report are fixed. What is
+*not* fixed is whose LLM drives the turns:
+
+### `self` mode — pheobe's own engine
+
+```
+adopter ──spawn──►  pheobe run --json  ──►  own endpoint (OpenAI-shaped / uno feature)
+```
+
+pheobe is the process: it runs intake→handoff on its own model endpoint.
+Full autonomy, needs `PHEOBE_BASE_URL`/`_MODEL`/`_API_KEY` (or `--features
+uno` on the fleet). This is the default mode of `pheobe run`.
+
+### `host` mode — the adopter is the engine (mayfly-style inversion)
+
+```
+adopter's LLM ──drives──►  pheobe protocol  (spawned inside the adopter's harness)
+```
+
+Here pheobe contributes no LLM at all — exactly like mayfly adapters, where
+the spawned harness (cursor/claude/codex) supplies the model and mayfly
+supplies the contract. The adopt kits ship the loop as a **prompt protocol**:
+
+- the persona file + the six-stage loop (orient/plan/implement/verify/
+  iterate/handoff) rendered into the subagent's system prompt / agent `.md`
+- the plan-tracker discipline (a plan file, steps checked off)
+- the `done_when` verify step as a bash command the subagent must run
+- the handoff report as the exact JSON shape to end with
+
+The `pheobe` binary stays useful in host mode as a *verifier* only:
+`pheobe verify <task.json>` runs the `done_when` gate + path-allowlist check
+and exits 0/1 — so a host-mode subagent can end its turn with a mechanical
+check instead of vibes (the same "mayflies don't end on vibes" rule, one
+subcommand instead of a watcher loop).
+
+| | `self` | `host` |
+|---|---|---|
+| LLM provider | pheobe's endpoint | the adopting harness's model |
+| binary involvement | full loop | kit install + `pheobe verify` |
+| fits | foreman/horse dispatch, mayfly `harness: "pheobe"`, plain CLI | opencode agents, claude subagents, codex, bro — anywhere the parent's model is already paying |
+
+Host mode is the cheap default for harness adopters (no endpoint config, one
+prompt file); self mode is the standalone posture (install the binary, it
+works anywhere). Kits declare their mode; a harness can install both.
+
+## Model endpoint
+
+Decision (2026-09-16): **own OpenAI-compatible client now, uno behind an
+opt-in cargo feature later.**
+
+- v0: minimal reqwest client over the OpenAI chat-completions wire format
+  (`/v1/chat/completions`, streaming, tool_calls). Works with the endpoints
+  the fleet already runs: opencode server, pipefish `/v1`, Ollama, flownet,
+  any OpenAI-shaped gateway. Config: `PHEOBE_BASE_URL` / `PHEOBE_API_KEY` /
+  `PHEOBE_MODEL`, plus `~/.pheobe/config.toml` (same env-overrides-config
+  shape bro uses).
+- Later: `--features uno` wires `uno::ChatProvider`/`step()`/`Toolset`
+  (path-dep `../uno`) for anthropic/gemini/kimi providers without the
+  OpenAI shim. Same opt-in posture as `buckets`' `buildsched` feature:
+  default build stays self-contained; `cargo tree` shows no uno.
+
+Toolset in v0 = pheobe's own built-in tools only; MCP is deliberately out
+(v0 non-goal) — a subagent shouldn't need its own servers.
+
+## Tool barn
+
+pheobe's own toolset for self mode — deliberately a *subset* of what cece-rs
+and bro already prove out, not a new invention. Both codebases share `uno`'s
+tool shapes, so porting is mechanical (cece: `CallableTool2` + schemars; bro:
+`Tool::new(name, desc, json_schema)` + dispatch — either compiles into
+pheobe's own client's tool registry).
+
+### Borrowed from cece-rs (`cece-agent/src/tools/`)
+
+| tool | what to take |
+|---|---|
+| `file/read.rs` | ReadFile with size/line limits — the guardrails are the value |
+| `file/replace.rs` | exact-string replace — the safest edit primitive for an unattended loop |
+| `file/write.rs` | write with diff preview; the approval gate collapses to allowlist enforcement in headless mode |
+| `file/glob.rs`, `file/grep.rs` | rg-backed search — direct port |
+| `shell.rs` | **output truncation** — the one headless-critical piece (approval gating drops out) |
+| `todo.rs` | the tracked-plan skeleton → becomes `plan_tracker` |
+| `test.rs` | run tests, parse structured pass/fail instead of raw terminal text |
+| `repomap.rs` | PageRank over the crush-symbols DB with `focus_files`/`focus_symbols` + token budget — the best "read the relevant files" orient tool in the fleet |
+| `think.rs` | thought logging → cheap, aids post-mortem reports |
+
+### Borrowed from bro (`bro-agent/src/tools/`)
+
+| tool | what to take |
+|---|---|
+| `edit.rs` | `str_replace`, `insert_content`, `multi_str_replace`, `view_diff` — the editing surface |
+| `test.rs` | `test_run` + `test_affected` — `crush_symbols` transitive caller impact → run only affected tests; directly serves the verify/iterate stages |
+| `format.rs` | format-on-write (BRO-93): rustfmt/gofmt/prettier after each write/edit |
+| `worktree.rs` | `provision_worktree` → wraps kitchen/buckets |
+| `git.rs` | status/diff/commit for the commit stage |
+| `dejavue.rs` | repo memory intake (`.dejavue/` boot packet) |
+| `guardrails.rs` / `write_policy.rs` | paths_allow enforcement at tool level |
+| `destructive_command.rs` | the destructive-bash guard — keep; it's a plain matcher, no organs needed |
+
+### pheobe v0 barn
+
+| tier | tools |
+|---|---|
+| core | read, write, edit (str_replace/insert/multi), glob, grep, ls, bash (truncation + destructive guard) |
+| loop | plan_tracker, verify (done_when + test_run parsing), worktree (provision/ship), git (status/diff/commit), format-on-write |
+| optional | polydex (skeleton/enclosing/callers/impact/affected-tests), repomap (orient), dejavue_context, **code-atlas edit** (structural write protocol) — skipped, not failed, when their backend is absent |
+| **excluded** | subagent/multiagent (no recursion), ask_user (headless — a blocked task becomes `{ok:false, blocked:true}` in the report), dmail/squad/notify, organs (maya/vision/interactd), mcp, compact (a scoped run shouldn't live long enough to need compaction; revisit if runs exceed ~100k tokens) |
+
+## Host-mode tool & skill passthrough
+
+In host mode pheobe's protocol runs *inside* the adopter's harness, so it
+inherits the host's body: the host's file/bash/web tools and its own skills
+system. The kit must be written so the loop is portable across bodies:
+
+1. **Tools are delegated, not duplicated.** The host-mode kit never
+   re-describes file editing or shell running; it refers to "the host's file
+   tools / shell tool" and adds only the *discipline* the host lacks:
+   the plan file convention, the `done_when` verify step, the JSON report
+   format. A host's own tools stay first-class (its permissions, its
+   approval gates, its display blocks).
+2. **Capability tiers with explicit fallbacks.** Each loop stage lists a
+   preferred path and a degraded path: worktree stage → `kitchen enter` →
+   `buckets worktree` → plain `git worktree add`; orient stage → host
+   symbols/repomap → plain grep. If a stage can't be executed at all
+   (e.g. no isolation primitive available), the subagent reports
+   `{ok:false, reason:"no_isolation"}` instead of improvising.
+3. **pheobe ships skills as markdown into the host.** `pheobe adopt --host`
+   installs the persona + loop protocol as host skills/agents
+   (`.claude/skills/…`, opencode agent `.md`, etc.), so the host's own skill
+   loader picks them up and the host's model runs pheobe's discipline with
+   host's tools. Repo-local `.pheobe/` overrides work the same way in both
+   modes — same files, two renderers.
+4. **Host skills stay visible.** A host-mode pheobe runs *with* the host's
+   installed skills (buckets-usage, mom's-kitchen doctrine, whatever the
+   harness already teaches), not in a sandboxed prompt bubble. The kit only
+   adds; it never strips.
+5. **`pheobe verify` is the shared exit gate.** In either mode the turn may
+   end mechanically: self mode runs it internally; host mode's subagent
+   calls it as a bash tool before emitting the report. Same task JSON, same
+   exit semantics.
+
+## Language & framework competence
+
+pheobe works across many languages. The canon's virtue #1 (know before you
+build) applies doubly here: a language is a *passport*, not trivia — the
+durable facts are its tooling surface, and even those must be confirmed
+from the repo on disk, not recalled.
+
+### Language passports (skill `language-passports`)
+
+One skill entry per language, encoding the tooling surface a competent
+builder knows — never assuming versions, always reading what's on disk:
+
+| passport | build | package mgr | test | format / lint | version truth |
+|---|---|---|---|---|---|
+| Rust | cargo (+ workspace) | cargo | `cargo test` | rustfmt / clippy | `Cargo.toml` + `Cargo.lock` on disk |
+| Python | — (uv, poetry, pip) | uv/pip | pytest | ruff / black | `pyproject.toml`, `uv.lock` |
+| Go | go toolchain | go mod | `go test` | gofmt / `go vet` | `go.mod` |
+| TS/JS | tsc / vite | npm/pnpm/bun | vitest/jest | biome/prettier/eslint | `package.json` + lockfile |
+| C/C++ | make / cmake / meson | vcpkg/conan | ctest / googletest | clang-format / clang-tidy | `CMakeLists.txt` |
+| Java/Kotlin | gradle / maven | same | junit | ktlint / spotless | `build.gradle*` / `pom.xml` |
+| Shell | shellcheck-managed | — | bats | shfmt / shellcheck | shebang |
+| SQL | — | migrations tooling | fixture-based | sqlfluff | schema files |
+
+The passport skill's rule: before running any build/test command, read the
+repo's manifest and **use the lockfile versions as ground truth**, not the
+model's memory of what version the ecosystem is on.
+
+### Specialized skills (beyond language)
+
+| skill | scope |
+|---|---|
+| `test-runner-craft` | per-runner output parsing (cargo/jest/pytest/go) — feeds `verify`; includes "read the actual failure text before proposing a fix" |
+| `build-system-craft` | detecting/repairing build systems; sibling path-deps must stay resolvable from worktrees (the `BUCKETS_WORKTREE_DIR` lesson) |
+| `literate-code-organizing` | module boundaries, naming (Dijkstra), dependency direction — wired to `say-it-twice` |
+| `dep-craft` | reading changelogs + semver; when adding a dep, read its docs from the vendored/installed source, never recall |
+| `shell-and-git-craft` | the git/gitops rules pheobe obeys (never main/master/dev, worktree doctrine) |
+| `docs-craft` | AGENTS.md / CLAUDE.md / README conventions — orient stage reads them before planning |
+
+## Knowledge drive (anti-cutoff)
+
+**Problem:** frameworks and tooling change fast; every model (and every
+adopting host) has a knowledge cutoff. A confident guess about an API that
+changed last quarter is worse than an admission of ignorance.
+
+**Borrowed from the squad:** jokersquad's `ctx` tool — a curated,
+freshness-tracked, citable *world model* of subjects a model cannot know:
+
+- `internal` — our own projects; never in any training set, however new
+- `external` — libraries/tools released or changed after the cutoff
+- `reference` — a clone we keep to *learn* from; ground truth is the clone
+  on disk — read it, don't recall it
+
+Entries are version-controlled markdown with front-matter (`slug`, `kind`,
+`version`, `last_verified`, `verified_by`, `sources`, `repos`,
+`cutoff_gap: true`), go stale after 90 days, and — the key property —
+**brief** into a compact block injected at the top of the prompt with the
+preamble: *where this conflicts with what you "know", this is right and
+you are wrong. If a detail isn't here, read the source. Do not guess an
+API into existence.*
+
+**pheobe's version:** a `pheobe ctx` subcommand over the same schema, two
+scopes:
+
+- `~/.pheobe/knowledge/` — global drive (languages, tools, frameworks);
+  the pheobe repo's `knowledge/` dir seeds it, version-controlled with the
+  binary's source
+- `<repo>/.pheobe/knowledge/` — repo-local entries (pinned framework
+  quirks, this repo's internal subject entries — what
+  `ctx brief --for-repo` would pick out on a squad box)
+
+Integration points:
+
+1. **orient** runs `pheobe ctx brief --for-repo <worktree>` and prepends
+   the block, deduped with the repo's `.dejavue/` boot packet — dejavue
+   stays the per-repo *why*; the drive is the world *what*.
+2. **ctx as a built-in tool** — the loop calls `pheobe ctx search` mid-run
+   whenever it hits a subject it suspects is post-cutoff.
+3. **verify/iterate** never consult model memory for API shape — absent a
+   fresh drive entry, read the source on disk (installed crate source,
+   node_modules, vendored docs). The `reference` kind becomes a standing
+   rule, not a convention.
+4. **host mode** — unchanged: the kit instructs the subagent to run
+   `pheobe ctx brief` the same way. It's prompt data, not a pheobe-only
+   mechanism; on a squad box pheobe's drive can *be* `.squad/research`
+   via config — same format, one shared research corpus.
+5. **stale discipline** — the report carries a `doubts` field noting which
+   claims rest on stale or missing entries, so the parent sees exactly
+   which facts are cutoff-risky.
+
+## Borrowed: contextgc — budgeted orient + tenured handoff
+
+**contextgc** (sibling crate, used by bro/razor/memory-cli) treats the
+context window as a managed heap: events → classify → promote → compact →
+tenure → recall/assemble, with liveness-ranked, character-budgeted
+assembly (`assemble(&RootSet, budget)`) and append-only JSONL tenure. It
+calls no model; the embedder is an injected trait. pheobe borrows it at
+two ends of the loop, *without* taking a compaction dependency in v0:
+
+1. **orient = budgeted assembly.** The orient stage is exactly a
+   `ContextGc::assemble` call: the root set is (task, done_when,
+   paths_allow), the stores are the repo's convention docs, `ctx brief`,
+   dejavue boot packet, and repomap/symbols hits. Assembled to the model's
+   prompt budget, liveness-ranked (task overlap > recency > access), all
+   deterministic — no embedder in v0, lexical matching only. A scoped run
+   shouldn't need mid-run compaction *because orient assembled the right
+   context in the first place* (that's why `compact` stays excluded).
+2. **handoff = tenure, not transcript.** The report's `summary` /
+   `next_steps` / `doubts` are a contextgc-shaped promotion: events are
+   classified into `Fact` / `Decision` / `Constraint` / `Task` /
+   `Question` — the exact `MemoryKind` set — and the parent gets
+   tenured records with lineage (which files/commits they cite), not a
+   session log to re-read. `record-doubts` (canon virtue #6) is the
+   `Question`/`Constraint` kind; `honest-handoff` (virtue #7) is the
+   tenure filter itself — only what survives liveness against
+   done_when is worth reporting.
+
+Optional later: `--features contextgc` (path-dep) to make tenure writes
+durable via `EpisodicStore` JSONL per run, giving parents a replayable
+audit trail beyond the summary — same opt-in posture as the uno feature.
+
+## Borrowed: runes — one meaning per field
+
+**runes** (semantic IR for AI reasoning) contributes a *discipline*, not a
+wire format, to pheobe's schemas. Three rules, borrowed:
+
+1. **One symbol = one meaning.** The plan file, task schema, and handoff
+   report are semantic IR: every field has exactly one semantic operation,
+   no synonyms, no polysemy. `branch` means the branch; `doubts` means
+   unverified assumptions; `next_steps` means actions for the parent. A
+   second consumer (foreman, mayfly, a rune-aware harness) must never
+   guess what a field meant — the field's meaning is the contract.
+2. **Relationships explicit, grammar implicit.** The report doesn't tell
+   a story ("first I tried X, then Y…"); it states relations: commits
+   point at files, tests point at the done_when they satisfy, doubts
+   point at the claims they qualify. The JSON shape is the graph.
+3. **Multiple representations, one graph.** Same semantic content, three
+   serializations depending on the reader: human prose (the report's
+   `summary`), JSON (the machine contract), and — where the parent is
+   rune-aware (bro synapse / flownet / joker_bridge) — a compact rune
+   packet per run, translated from the same graph, not authored
+   separately. The loop's VERIFY stage *is* the rune `ᚦ`'s VERIFY
+   operation applied to `done_when`: check, don't narrate.
+
+v0 implements only the discipline (fixed JSON schema, relation-shaped
+report). Rune-packet emission is a later optional feature gated on a
+rune-aware parent — no dependency now.
+
+## Borrowed: polydex + code-atlas — the structural read/write ladder
+
+`crush-symbols` was renamed **polydex** (`crush-workspace/polydex`); pheobe
+targets polydex and treats the old name as deprecated. **code-atlas**
+(design-only, ratified as its own repo consuming polydex as a peer dep) is
+the structure-aware write protocol. Together they upgrade pheobe's barn
+from text coordinates to structural coordinates:
+
+### Read ladder (orient) — polydex when the index is fresh
+
+| pheobe stage | text tool (always available) | structural tool (when `polydex` on PATH) |
+|---|---|---|
+| orient / find files | glob | `polydex index` report + `hotspots` |
+| understand a file | read + grep | `polydex skeleton <file>` — signatures-only, one screen |
+| find a definition | grep | `polydex find` / `enclosing` |
+| check blast radius | grep callers | `polydex callers` / `impact` (transitive) |
+| pick tests to run | guess / run all | `polydex affected-tests` (feeds `test_affected` → verify stage) |
+| grouped search | grep | `polydex grep` (grouped by enclosing symbol, ranked by coupling) |
+
+Rule: `polydex status` freshness gates the swap — if the index is stale,
+pheobe falls back to text tools and *says so in the report* (polydex's own
+`maybe_wrap_stale` honesty rule, adopted as pheobe's too).
+
+### Write path (implement) — code-atlas as the preferred edit mechanism
+
+Text-coordinate editing is the #1 failure mode of unattended agent coders:
+past a few hundred LOC, line numbers drift and `str_replace` anchors rot.
+pheobe's edit tier is a ladder:
+
+1. **code-atlas edit (preferred, when available):** stable region handle
+   (`path|lang|kind|qualified` — survives line drift) + two-hash guard
+   (region content-hash is the default; whole-file hash under `strict`)
+   + parse-gated atomic write (tree-sitter validates the candidate buffer
+   before anything lands) + unified diff returned, always. An edit that
+   fails revision or parse changes nothing — the machine checks, not the
+   model's memory (canon virtue #5).
+2. **str_replace (built-in fallback):** exact-string replace with
+   uniqueness enforcement.
+
+The code-atlas invariants are pheobe's canon in tool form, adopted
+verbatim:
+
+- never apply on revision mismatch → machine-checks
+- never resolve ambiguity silently (`AmbiguousSymbol { candidates }`, no
+  `matches[0]`) → a blocked task is `{ok:false, blocked:true}` +
+  `doubts`, never a best-effort guess (record-doubts, honest-handoff)
+- never fake structural success; always return the diff → no alibis
+- never escape the root jail → the scope-is-a-contract standing rule
+
+### Convergence at orient: context pack
+
+code-atlas's planned `atlas.context(task)` retrieval pack and the
+contextgc-shaped budgeted assembly (above) are the same idea at two
+layers — task-anchored, token-budgeted context assembled from repo facts.
+pheobe's orient stage consumes whichever exists: code-atlas pack >
+polydex index reads > raw text tools, in that order, each skipped (and
+noted) when absent. No pheobe-owned indexing, no embedder, no MCP — both
+tools are subprocesses on PATH, same skip-don't-fail posture as dejavue.
+
+## Borrowed: jokersquad host-layer (final sweep)
+
+| borrow | what | where in pheobe |
+|---|---|---|
+| `safe-exec` + `scan-destructive-code` | scan the command (and any script it points at) before exec; modes `warn`/`deny`/`off`; exit 99 on hard-deny — born from the 2026-05-15 disaster | the bash tool's destructive guard becomes scan-gated exec with the same mode semantics (`PHEOBE_SAFE_EXEC_MODE`) |
+| `checkpoint` | git-stash-backed *named snapshot* of current dirty state; never touches the working tree | iterate stage: checkpoint at each plan-step boundary; a failed iteration restores the checkpoint instead of hand-editing backwards |
+| `commit-msg-agent-trailer` | commits carry agent-identity trailers | handoff: pheobe commits get a `Pheobe-Task: <id>` provenance trailer |
+| `agent-handoff` stand-down gate | reassignment requires prior owner's ack | parent-side doctrine; pheobe respects it by never merging — it ships the branch, the parent merges |
+| two-layer identity (role + instance) | `identities/<name>.md` role vs accumulated instance memory | pheobe ships the role only (`persona/pheobe.md`); per-repo instance knowledge is already the repo's `.dejavue/` — a scoped worker keeps no second memory layer |
+
+## Persona & skills
+
+The persona is not invented — it is mined from the people who built the
+field, distilled into seven virtues each wired to a loop stage (full text:
+[`persona/pheobe.md`](persona/pheobe.md)):
+
+| virtue | loop stage | mined from |
+|---|---|---|
+| know before you build | orient | Knuth (read the pioneers' source), Thompson (hold it in your head) |
+| minimal primitives, maximal leverage | plan | Thompson (four calls), Wirth (do no more than necessary), Hamming (transform the hard into the doable) |
+| say it twice — informal then formal | implement | Knuth (literate programming; record what doesn't work) |
+| taste is removing special cases | implement | Torvalds, Liskov (abstraction that hides complexity) |
+| the machine checks everything mechanical | verify | Hopper (don't check by hand), Carmack (measure), Norvig (debug as hypothesis testing) |
+| tolerate ambiguity, record the doubts | iterate | Hamming, Darwin (write down contradicting evidence), Stoics (equanimity, no thrash) |
+| honest handoff, no alibis | handoff | Hamming (the alibis chapter), Feynman (write down the problem first) |
+
+The persona file carries the voice too: terse, declarative, no performance
+of effort — reports state what is true of the code, not how hard the
+session worked. Standing rules: scope is a contract ("while I'm here" is
+the ulcer that killed Knuth's Volume 2 schedule); compound interest
+(Hamming/Bode — one more careful read, every run); the dishes get done
+(worktree + branch + report or the run failed); the deadline is self-set
+from ttl/budget at intake.
+
+- `~/.pheobe/persona.md` default persona (the canon above), overridable
+  per repo by `.pheobe/persona.md`.
+- `~/.pheobe/skills/` + repo `.pheobe/skills/` — markdown skill files loaded
+  into the system prompt, same convention the workspace already uses for
+  personas/skills (jokersquad identities, buckets-usage skill).
+- The canon ships as skills, not just prose: `know-before-build`,
+  `minimal-primitives`, `say-it-twice`, `remove-special-cases`,
+  `machine-checks`, `record-doubts`, `honest-handoff`, `stoic-budget` —
+  each is a checkable behavioral rule, not a mood.
+
+## Adoption kits (`adopt/`)
+
+| kit | mechanism | mode |
+|---|---|---|
+| `adopt/claude/agents/pheobe.md` | Claude Code subagent def; spawns `pheobe run --json`, parses the report | self |
+| `adopt/claude/host/agents/pheobe.md` | subagent def embedding the pheobe loop protocol; runs on claude's own model | host |
+| `adopt/opencode/agent/pheobe.md` | opencode markdown agent (tool-restricted) | self |
+| `adopt/opencode/host/agent/pheobe.md` | opencode agent embedding the loop protocol (opencode agents are exactly this shape — prompt + tool gating, parent's model) | host |
+| `adopt/codex/README.md` | no native subagents — bash-tool invocation | self |
+| `adopt/bro/` | ACP: `pheobe acp --stdio` ↔ `bro synapse dispatch --` | self |
+| `adopt/README.md` | the contract every kit wraps | — |
+
+Each kit is a thin wrapper over the JSON contract; none of them change it.
+
+## CLI
+
+```
+pheobe run     <task.json|-|--task "…">  # the loop, self mode; JSON report on stdout
+pheobe verify  <task.json>               # done_when + allowlist gate; exit 0/1 (host mode)
+pheobe ctx     list|brief|get|search|new|verify   # knowledge drive (borrowed from jokersquad ctx)
+pheobe acp     [--stdio]                 # ACP stdio server (bro/ACP adopters)
+pheobe adopt   <claude|opencode|codex|bro> [--host]  # print/install that harness's kit
+pheobe doctor                              # endpoint + worktree primitive check
+```
+
+## Non-goals
+
+- TUI, REPL, daemon, HTTP server (ACP stdio only)
+- Long-lived memory, personas-as-identity, bridge presence — pheobe is a
+  worker, not a teammate; anything worth remembering belongs in the *repo's*
+  `.dejavue/`, not pheobe's head
+- Recursive agent spawning (parents fan out; pheobe never does)
+- MCP client/server in v0
+- Replacing mayfly, bro, or foreman — it slots under all three
+
+## Success metric
+
+A good pheobe run:
+
+1. validates and starts in <1s
+2. finishes or reports failure within ttl/budget — never hangs silent
+3. touches only `paths_allow`, only in its own worktree
+4. leaves the parent's checkout byte-identical
+5. hands off a report the parent can act on without reading the transcript

@@ -1,0 +1,20 @@
+[package]
+name = "pheobe"
+version = "0.0.1"
+description = "A coding workhorse with no face. Task in, worktree branch + handoff report out."
+edition = "2021"
+license = "MIT OR Apache-2.0"
+readme = "DESIGN.md"
+keywords = ["agent", "subagent", "coding-agent", "harness"]
+categories = ["command-line-utilities", "development-tools"]
+
+[[bin]]
+name = "pheobe"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive", "env"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
