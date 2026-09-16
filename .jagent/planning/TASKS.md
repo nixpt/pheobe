@@ -76,6 +76,8 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 - [x] PHEOBE-27 — release channel checked + `publish.yml` (crates.io) added; `docs/RELEASING.md`
 - [x] PHEOBE-28 — CONTRIBUTING, dejavue init, provenance → public pointers, passport references
 - [x] PHEOBE-29 — knowledge drive mechanics: corpus compiled in, `ctx seed`, brief injects matching bodies, doctor counts
-- [ ] promote: `gh repo create nixpt/pheobe` + push `main` + hand-tag `v0.1.0` → publish (captain's call, PHEOBE-27)
+- [x] promoted 2026-09-16: `nixpt/pheobe` public, v0.1.0 hand-tagged, v0.2.0 minted by release.yml, **pheobe 0.2.0 on crates.io**
+- [x] PHEOBE-30 — release.yml dispatches publish.yml at the minted tag (bot tags raise no push event)
+- [ ] configure crates.io Trusted Publishing for `publish.yml`, then drop the `CARGO_REGISTRY_TOKEN` secret
 - [ ] decide whether the `/workspace/external/…` provenance citations in `adopt/` and
       `knowledge/` should ship in the crate as-is (PHEOBE-20 non-goal, flagged)

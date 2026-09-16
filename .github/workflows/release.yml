@@ -20,6 +20,7 @@ on:
 
 permissions:
   contents: write
+  actions: write # to dispatch publish.yml at the tag this run mints (see below)
 
 jobs:
   bump:
@@ -51,3 +52,21 @@ jobs:
           BUMPVER_GIT_EMAIL: release@pheobe.local
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} # so `gh release create` inside the script authenticates
         run: ./scripts/bump-version.sh
+
+      # A tag pushed with GITHUB_TOKEN does NOT raise a push event (the same
+      # recursion guard that keeps the bump commit from re-running this job),
+      # so publish.yml's `on: push: tags` never sees a bot-minted tag.
+      # workflow_dispatch is the documented exception — dispatch it by hand
+      # at exactly the tag just created. No new tag → nothing to publish.
+      - name: dispatch publish at the new tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="$(git describe --tags --exact-match HEAD 2>/dev/null || true)"
+          case "$tag" in
+            v[0-9]*)
+              echo "dispatching publish.yml at $tag"
+              gh workflow run publish.yml --ref "$tag" ;;
+            *)
+              echo "no version minted by this run — nothing to publish" ;;
+          esac
