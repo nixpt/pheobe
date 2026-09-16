@@ -25,9 +25,8 @@ key to unblock.
       `git describe --exact-match` → `gh workflow run publish.yml --ref <tag>`;
       no tag → "nothing to publish"
 - [x] docs/RELEASING.md explains the dispatch and records the 0.1.0/0.2.0 history
-- [ ] proven on the next `feat:`/`fix:` merge: release → dispatch → publish
-      green with the repo's `CARGO_REGISTRY_TOKEN` (already-published skip
-      also counts as green)
+- [x] proven: the PHEOBE-31/32 `feat(update)` merge → v0.3.0 minted → publish
+      dispatched → 0.3.0 published, unattended (token then; OIDC since)
 
 ## Non-goals
 

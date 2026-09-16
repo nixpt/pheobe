@@ -80,6 +80,6 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 - [x] PHEOBE-30 — release.yml dispatches publish.yml at the minted tag (bot tags raise no push event)
 - [x] PHEOBE-31 — `pheobe doctor` prints compiled version vs crates.io / github tags
 - [x] PHEOBE-32 — `pheobe update` (`cargo install pheobe --locked --force`; git fallback)
-- [ ] configure crates.io Trusted Publishing for `publish.yml`, then drop the `CARGO_REGISTRY_TOKEN` secret
+- [x] crates.io Trusted Publishing configured (captain, 2026-09-16), proven via `publish.yml verify_auth`; `CARGO_REGISTRY_TOKEN` secret deleted — publish.yml runs on OIDC only
 - [ ] decide whether the `/workspace/external/…` provenance citations in `adopt/` and
       `knowledge/` should ship in the crate as-is (PHEOBE-20 non-goal, flagged)

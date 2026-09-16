@@ -43,6 +43,8 @@ on crates.io → crate settings → Trusted Publishing → GitHub, repository
 `CARGO_REGISTRY_TOKEN` repository secret. Trusted Publishing can only be
 configured on a crate that already exists, so the very first publish uses
 the token (secret or a local `cargo publish`); after that the secret can go.
+**State (2026-09-16):** Trusted Publishing is configured and verified
+(`verify_auth` run); the repo holds no `CARGO_REGISTRY_TOKEN` secret.
 
 `release.yml` pushes as `pheobe-release` with the workflow's own
 `GITHUB_TOKEN`; the `fleet-default-main-protection` ruleset (deletion +

@@ -39,9 +39,9 @@ and the missing crates.io leg.
 - [x] `scripts/bump-version.sh` header names `main`
 - [x] `.github/workflows/publish.yml` on `v*` tags (+ `workflow_dispatch verify_auth`)
 - [x] `docs/RELEASING.md`; `docs/` excluded from the crate
-- [ ] `gh repo create nixpt/pheobe` + push `main` + `gh-ruleset --policy fleet-default` (captain: visibility)
-- [ ] hand-tag `v0.1.0` → publish.yml → crates.io `pheobe 0.1.0` (captain: go + credential)
-- [ ] after first publish: configure Trusted Publishing on crates.io, drop the token
+- [x] `gh repo create nixpt/pheobe` (public) + push `main` + `gh-ruleset --policy fleet-default`
+- [x] hand-tag `v0.1.0`; first crates.io version was 0.2.0 (feat merge minted it before the first publish); 0.3.0 followed unattended
+- [x] Trusted Publishing configured + verified; token secret deleted
 
 ## Non-goals
 
