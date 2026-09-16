@@ -143,6 +143,11 @@ fn run_cmd() -> Result<()> {
 
 fn cmd_run(task_file: &str, branch: Option<String>) -> Result<()> {
     let task = task::load(task_file)?;
+    // sandbox intake gate (PHEOBE-14): an un-deliverable strict tier is a
+    // blocked:no_sandbox BEFORE the loop, never a mid-run surprise
+    let sandbox_tier_name = task.effective_sandbox()?;
+    let sandbox_tier = pheobe::sandbox::Tier::from_name(&sandbox_tier_name)?;
+    pheobe::sandbox::ensure_at_intake(&sandbox_tier)?;
     let repo = task.resolve_repo()?;
     let branch = branch.or(task.branch.clone()).unwrap_or_else(|| format!("pheobe/{}", task_slug(&task.task)));
     let task_id = task_slug(&task.task);
@@ -160,7 +165,12 @@ fn cmd_run(task_file: &str, branch: Option<String>) -> Result<()> {
 
     // orient: knowledge drive brief (repo-local + global drives) + learned nudges
     let entries = knowledge::load_all(Some(&wt))?;
-    let brief = knowledge::brief(&entries);
+    let mut brief = knowledge::brief(&entries);
+    // strict-tier note rides in the prompt so the model knows the bash
+    // tool is allowlist-gated and network-free
+    if sandbox_tier_name == "strict" {
+        brief.push_str(pheobe::sandbox::STRICT_NOTE);
+    }
     let nudges = learn::nudges_for(&repo_str);
     if !nudges.is_empty() {
         eprintln!("📚 {} learned nudge(s) for this repo", nudges.len());
