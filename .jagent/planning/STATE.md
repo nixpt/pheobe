@@ -13,13 +13,13 @@
 (`--attach`, live paid + free), cursor (SDK-grounded, PHEOBE-23), codex
 (static SDK check), agy (adapter + kit); ACP server; knowledge drive
 compiled in (`ctx seed`, matching bodies in the brief); `pheobe update`.
-148 tests, clippy `-D warnings` + fmt clean, `cargo package` in CI.
+157 tests, clippy `-D warnings` + fmt clean, `cargo package` in CI.
 
-**Coverage (cargo-llvm-cov, 2026-09-16):** 79.31% lines / 77.69% regions.
-`main.rs` 0% (no CLI tests — PHEOBE-34), `tools/search.rs` 14% (PHEOBE-35),
-`memory.rs` 62% (host store), `update.rs` 69% (live probe + install spawn).
+**Coverage (cargo-llvm-cov, 2026-09-16, post PHEOBE-34):** 83.16% lines /
+81.05% regions. `main.rs` 80.91% (CLI contract tests), `tools/search.rs` 14%
+(PHEOBE-35), `memory.rs` 62% (host store), `update.rs` live probe + install spawn.
 
-**Open:** issue 10 (ETXTBSY test flake, P4); PHEOBE-34/35 (coverage);
+**Open:** issue 10 (ETXTBSY test flake, P4); PHEOBE-35 (search coverage);
 kimi adapter never run live; a native claude host kit (gap in DESIGN's kit
 table); sandbox-tier mapping table across adapters; free-tier opencode
 budget note in the adapter doc.

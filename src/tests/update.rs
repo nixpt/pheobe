@@ -1,8 +1,8 @@
 //! PHEOBE-31: doctor version probe; PHEOBE-32: cargo install argv.
 
 use crate::update::{
-    cargo_install_args, check, parse_crates_io, parse_github_tags, should_install, Probe, Source,
-    Status, CRATE, GIT_URL,
+    cargo_install_args, check, check_exit_code, parse_crates_io, parse_github_tags, should_install,
+    Probe, Source, Status, CRATE, GIT_URL,
 };
 use anyhow::Result;
 
@@ -154,4 +154,14 @@ fn should_install_only_when_behind_or_forced() {
     let down = check("0.2.0", &fake(Err("down"), Err("down")));
     let err = format!("{:#}", should_install(&down, true).unwrap_err());
     assert!(err.contains("unreachable"), "got {err}");
+}
+
+#[test]
+fn check_exit_code_nonzero_when_behind_or_unreachable() {
+    let current = check("0.2.0", &fake(Ok(Some("0.2.0")), Ok(None)));
+    assert_eq!(check_exit_code(&current), 0);
+    let behind = check("0.1.0", &fake(Ok(Some("0.2.0")), Ok(None)));
+    assert_eq!(check_exit_code(&behind), 1);
+    let down = check("0.2.0", &fake(Err("down"), Err("down")));
+    assert_eq!(check_exit_code(&down), 1);
 }

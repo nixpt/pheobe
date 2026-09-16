@@ -4,9 +4,9 @@
 |-------|-------|
 | **ID** | PHEOBE-34 |
 | **Priority** | P2 |
-| **Status** | Backlog |
+| **Status** | Done |
 | **Phase** | M3 — fidelity and proof |
-| **Assignee** | unassigned — claim on `scripts/pheobe-sync` |
+| **Assignee** | nixpt/cursor |
 | **Dependencies** | none |
 | **Estimated effort** | S |
 
@@ -21,11 +21,11 @@ nothing proves it.
 
 ## Success criteria
 
-- [ ] `src/tests/cli.rs` spawns the built binary via
+- [x] `src/tests/cli.rs` spawns the built binary via
       `env!("CARGO_BIN_EXE_pheobe")` (no PATH dependence), with `HOME` and
       `PHEOBE_KNOWLEDGE_DIR` pointed at a scratch dir so no test touches the
       user's `~/.pheobe`
-- [ ] covered: `verify` pass + fail (exit 0/1, the `✗ done_when failed:` reason
+- [x] covered: `verify` pass + fail (exit 0/1, the `✗ done_when failed:` reason
       on stderr — issue 08 contract); `host setup` → `host finish` round trip on
       a fixture repo; `adopt <every kit>` prints the kit and unknown names fail;
       `ctx seed` (writes N, then keeps), `ctx list`, `ctx brief --for-repo` on a
@@ -34,9 +34,17 @@ nothing proves it.
       `run` on a task without `done_when` is refused at intake with a clear
       message and no worktree created; `run --json` accepted; `update --check`
       offline exits non-zero with a reason
-- [ ] no test needs a model, a network, or a harness binary
-- [ ] `main.rs` line coverage ≥ 70%; total ≥ 82% (was 79.31%)
-- [ ] `cargo test` stays under ~15 s; the CLI tests share one fixture builder
+- [x] no test needs a model, a network, or a harness binary
+- [x] `main.rs` line coverage ≥ 70%; total ≥ 82% (was 79.31%)
+- [x] `cargo test` stays under ~15 s; the CLI tests share one fixture builder
+
+## Resolution
+
+Cargo `[[test]]` target at `src/tests/cli.rs` (not `mod cli` — `CARGO_BIN_EXE_*`
+is only injected for integration tests). 8 CLI tests + `update::check_exit_code`
+so `pheobe update --check` exits 1 when the channel is unreachable instead of
+looking already-current. llvm-cov after: `main.rs` 80.91% lines (42 missed /
+220), TOTAL 83.16% (was 79.31%). 157 tests; CLI suite 0.13 s. Not pushed.
 
 ## Technical approach
 
