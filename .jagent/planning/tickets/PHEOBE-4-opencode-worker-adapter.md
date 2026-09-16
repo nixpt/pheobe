@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | PHEOBE-4 |
 | **Priority** | P1 |
-| **Status** | Backlog |
+| **Status** | In Progress |
 | **Phase** | M0 — the loop exists; exit gate must pass a real run |
 | **Assignee** | unassigned |
 | **Dependencies** | PHEOBE-9 (Worker trait) |
@@ -41,22 +41,62 @@ or a session against a running `opencode serve` via `--attach` / REST
 
 ## Success criteria
 
-- [ ] A `Worker` trait exists alongside `Provider` ("one prompt in, the
+- [x] A `Worker` trait exists alongside `Provider` ("one prompt in, the
       whole turn loop runs outside, one result comes back"); the loop
       dispatcher picks provider vs worker from `PHEOBE_PROVIDER`.
-- [ ] `PHEOBE_PROVIDER=opencode` runs the task through `opencode run
-      --agent pheobe -m "$PHEOBE_OPENCODE_MODEL" --format json` (and
-      `--attach "$PHEOBE_OPENCODE_URL"` when set), with the protocol
-      envelope as the prompt.
-- [ ] Report normalization: engine output is prose; pheobe runs
+      **Satisfied by PHEOBE-9** (merged W1): `src/worker.rs` holds the
+      trait + `WorkerOutcome` + `worker_from_env` dispatcher; `agent.rs`
+      `run_worker` wraps it with the aging-ladder/budget guards.
+- [x] `PHEOBE_PROVIDER=opencode` runs the task through `opencode run
+      --format json [-m "$PHEOBE_OPENCODE_MODEL"] [--attach
+      "$PHEOBE_OPENCODE_URL" when set] --auto --dir <worktree>`, with the
+      protocol envelope as the prompt. Implemented in
+      `src/worker_opencode.rs` (PHEOBE-4). NOTE/DEVIATION: `--agent
+      pheobe` is deliberately omitted — the def only exists where the
+      adopt kit was installed, and the prompt envelope is self-contained;
+      argv follows mayfly's proven shape, re-verified against
+      `opencode run --help` (1.18.31). Child-level subprocess timeout
+      (default 600s, `PHEOBE_OPENCODE_TIMEOUT_SECS`) added so the engine
+      process itself cannot hang forever under the ladder.
+- [x] Report normalization: engine output is prose; pheobe runs
       `pheobe verify` + mechanical gates and builds the report itself;
       engine JSON (if the last message parses) merges into
-      summary/next_steps/doubts only.
-- [ ] Aging ladder still enforced around a delegated engine (wall-clock
+      summary/next_steps/doubts only. Adapter extracts `json_tail` from
+      the final text (whole-text / ```json fence / widest `{...}` span,
+      object-only); `agent::normalize_worker_outcome` (PHEOBE-9) merges
+      only summary/next_steps/doubts/blocked and honors ok:false.
+- [x] Aging ladder still enforced around a delegated engine (wall-clock
       TTL checked around the `opencode run` subprocess; kill on expiry,
-      report `ttl_exceeded` as task-design failure).
+      report `ttl_exceeded` as task-design failure). PHEOBE-9's
+      before/after ladder checks in `run_worker` + the adapter's own
+      subprocess kill at `PHEOBE_OPENCODE_TIMEOUT_SECS`.
 - [ ] `pheobe adopt opencode` prints all three files (self-agent.md,
-      host-agent.md, pheobe-host.md) + the `opencode.jsonc` snippet with
-      the sandbox-tier mapping.
-- [ ] Mock-able at the same seam as `Provider` (scripted subprocess or
-      trait object) so tests stay network-free.
+      host-agent.md, pheobe-host.md) + the `opencode.jsonc` snippet.
+      **Partial, satisfied by PHEOBE-15 only per-subcommand**: all three
+      opencode files exist (`adopt/opencode/{self-agent.md,
+      pheobe-host.md, opencode.jsonc-snippet.md}`), but `pheobe adopt
+      opencode` prints only pheobe-host.md and `pheobe adopt
+      opencode-self` prints self-agent.md + the snippet. One-line
+      main.rs change (have `AdoptCmd::Opencode` print all three) — left
+      for a main.rs-touching task to keep this branch's shared-file edits
+      minimal.
+- [x] Mock-able at the same seam as `Provider` (scripted subprocess or
+      trait object) so tests stay network-free. 7 model-free tests
+      (prefix `opencode_` in src/tests.rs) drive the real adapter
+      through a fake `opencode` shell script that records argv + cwd and
+      emits a canned event stream; plus the PHEOBE-9 `ScriptedWorker`
+      trait-object seam.
+
+## Resolution (PHEOBE-4, in progress)
+
+Adapter + registry entry landed on branch agent/nixp/PHEOBE-4-opencode.
+Build: zero errors/warnings (`cargo check --all-targets`). Tests: 41
+pass (34 base + 7 new), repeat-run stable. Live smoke on opencode
+1.18.31 (`opencode run --format json --auto "Reply with exactly the
+single word: ok"`) produced the exact event shapes the parser handles:
+`text` part (`part.text` + `time.end`) → final_text "ok"; `step_finish`
+part (`tokens {total, input, output, reasoning, cache{read,write}}`,
+`cost`) → sum = tokens.total for that step. Event stream shape verified
+from source too (`cli/cmd/run.ts` emit + `session/processor.ts`
+step-finish part). Remaining: the `pheobe adopt opencode` one-liner
+above. Not merged to main; no push.

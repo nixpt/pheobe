@@ -40,7 +40,7 @@ pub trait Worker {
 /// anywhere else, and hosts resolve through this one place.
 type WorkerFactory = fn() -> Result<Arc<dyn Worker>>;
 const REGISTRY: &[(&str, WorkerFactory)] = &[
-    // ("opencode", opencode::worker as WorkerFactory),  // PHEOBE-4
+    ("opencode", crate::worker_opencode::worker as WorkerFactory), // PHEOBE-4
     // ("claude", claude::worker as WorkerFactory),      // PHEOBE-5
 ];
 
