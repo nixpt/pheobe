@@ -74,6 +74,8 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 - [x] PHEOBE-18 — release posture: publish readiness, bump kit, `release.yml`
 - [x] PHEOBE-20 — release candidate audit: LICENSE-APACHE, README, CI gate, clippy/fmt
 - [x] PHEOBE-27 — release channel checked + `publish.yml` (crates.io) added; `docs/RELEASING.md`
+- [x] PHEOBE-28 — CONTRIBUTING, dejavue init, provenance → public pointers, passport references
+- [ ] PHEOBE-29 — knowledge drive mechanics: embed + `ctx seed`, brief injects matching bodies
 - [ ] promote: `gh repo create nixpt/pheobe` + push `main` + hand-tag `v0.1.0` → publish (captain's call, PHEOBE-27)
 - [ ] decide whether the `/workspace/external/…` provenance citations in `adopt/` and
       `knowledge/` should ship in the crate as-is (PHEOBE-20 non-goal, flagged)

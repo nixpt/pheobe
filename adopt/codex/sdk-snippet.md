@@ -5,8 +5,8 @@ the Python `openai-codex` route for a host that wants codex as the
 engine: one thread start with the protocol envelope as base
 instructions, one turn with the task.
 
-Source-grounded against
-`/workspace/external/codex-src/sdk/python/docs/api-reference.md`:
+Source-grounded against the Codex Python SDK reference,
+github.com/openai/codex `sdk/python/docs/api-reference.md` (PyPI `openai-codex`):
 `thread_start(*, approval_mode=..., base_instructions=None, config=None,
 cwd=None, model=None, sandbox: Sandbox | None = None) -> Thread` and
 `run(input, *, approval_mode=None, cwd=None, sandbox=None, ...) ->

@@ -116,6 +116,12 @@ prints the kit; `adopt/README.md` states the contract every kit wraps.
 six-stage loop, execution modes, the sandbox ladder, the tool barn, what was
 borrowed from sibling projects and what was deliberately declined.
 
+## Contributing
+
+`CONTRIBUTING.md` — branch-in-a-worktree, conventional commits (they drive
+releases), the four checks CI runs, how to add a worker adapter or a knowledge
+entry. Repo memory lives in `.dejavue/` (`dejavue context` for the boot packet).
+
 ## License
 
 Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or

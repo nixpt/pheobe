@@ -9,6 +9,9 @@ cutoff_gap: false
 tags: [sql, sqlite, passport, tooling, migrations]
 sources:
   - DESIGN.md §"Language & framework competence" (pheobe repo — the passport table)
+  - SQLite — sqlite.org/docs.html (dialect, `PRAGMA`, FTS5, WAL) · PostgreSQL — postgresql.org/docs
+  - sqlfluff — docs.sqlfluff.com (dialect-aware lint/format)
+  - migration tools decide version truth: sqlx (docs.rs/sqlx) `migrations/`, Flyway/Liquibase `V*__` files, dbmate `db/migrations/`
 ---
 
 ## What it is

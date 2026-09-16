@@ -6,7 +6,7 @@ for self mode, `adopt/opencode/pheobe-host.md` for host mode). Source
 grounding: the `agent` config section maps onto opencode's
 `Agent.Info` = `{ name, description, mode: "subagent"|"primary"|"all",
 permission: ruleset, model?, tools?, prompt? }` (read from
-`/workspace/external/opencode`).
+the opencode source, github.com/anomalyco/opencode `packages/opencode/src/agent/`, v1.2.x).
 
 ## Snippet
 

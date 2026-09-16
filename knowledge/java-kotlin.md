@@ -9,6 +9,9 @@ cutoff_gap: false
 tags: [java, kotlin, passport, tooling, gradle, maven]
 sources:
   - DESIGN.md §"Language & framework competence" (pheobe repo — the passport table)
+  - Gradle user manual — docs.gradle.org (wrapper, version catalogs `libs.versions.toml`, `--offline`)
+  - Maven — maven.apache.org/guides (lifecycle, `-o`, `dependency:tree`)
+  - Kotlin docs — kotlinlang.org/docs (Gradle plugin versions, K2 compiler flags)
 ---
 
 ## What it is

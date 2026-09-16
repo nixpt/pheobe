@@ -13,8 +13,8 @@ JSON report contract:
 
 `pheobe adopt cursor` prints this file, then `pheobe-host.md`.
 
-Source-grounded against `/workspace/external/cursor-sdks` `@cursor/sdk`
-1.0.31: `AgentDefinition` in `ts-src/dist/esm/agent/options.d.ts` =
+Source-grounded against `@cursor/sdk` 1.0.31 (npm; Python `cursor-sdk`
+1.0.31 on PyPI; docs at cursor.com/docs/sdk): `AgentDefinition` in `ts-src/dist/esm/agent/options.d.ts` =
 `{ description, prompt, model?: ModelSelection \| "inherit", mcpServers? }`.
 `tools` / `disallowedTools` live on `AgentOptions` (parent create/resume),
 not on `AgentDefinition`. Live CLI: `cursor-agent --help`

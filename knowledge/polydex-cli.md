@@ -8,9 +8,8 @@ verified_by: nixp
 cutoff_gap: true
 tags: [polydex, code-intelligence, cli, mcp, tooling, external]
 sources:
-  - live binary: `polydex --help` (/home/nixp/.local/bin/polydex, observed 2026-09-16 — the full subcommand list below)
-  - /workspace/projects/crush-workspace/polydex/README.md (read 2026-09-16)
-  - /workspace/projects/crush-workspace/polydex/AGENTS.md (the `polydex init`-generated usage block)
+  - live binary: `polydex --help` (observed 2026-09-16 — the full subcommand list below)
+  - github.com/nixpt/polydex `README.md` + `AGENTS.md` (the `polydex init`-generated usage block; private repository at time of writing — install from a checkout with `cargo install --path .`)
 ---
 
 ## What it is

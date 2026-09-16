@@ -9,6 +9,9 @@ cutoff_gap: false
 tags: [shell, bash, passport, tooling, shellcheck, bats]
 sources:
   - DESIGN.md §"Language & framework competence" (pheobe repo — the passport table)
+  - ShellCheck wiki — shellcheck.net/wiki (every SC code, with the fix)
+  - bats-core — bats-core.readthedocs.io (test layout, `setup`/`teardown`, `run`)
+  - shfmt — github.com/mvdan/sh (formatter; `-i 4 -ci` conventions) · POSIX sh — pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html
 ---
 
 ## What it is

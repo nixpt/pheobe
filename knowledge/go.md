@@ -9,6 +9,9 @@ cutoff_gap: false
 tags: [go, golang, passport, tooling]
 sources:
   - DESIGN.md §"Language & framework competence" (pheobe repo — the passport table)
+  - go command — pkg.go.dev/cmd/go (modules, `go.work`, `go test` flags, `go vet`)
+  - modules reference — go.dev/ref/mod (`go.sum` semantics, `replace`, MVS)
+  - golangci-lint — golangci-lint.run (the lint umbrella most repos gate on)
 ---
 
 ## What it is

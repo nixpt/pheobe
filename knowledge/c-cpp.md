@@ -9,6 +9,9 @@ cutoff_gap: false
 tags: [c, cpp, passport, tooling, cmake]
 sources:
   - DESIGN.md §"Language & framework competence" (pheobe repo — the passport table)
+  - CMake reference — cmake.org/cmake/help/latest (presets, targets, `CMAKE_EXPORT_COMPILE_COMMANDS`)
+  - clang tooling — clang.llvm.org/docs (ClangFormat, clang-tidy checks, sanitizers)
+  - vcpkg — vcpkg.io/en/docs · Conan — docs.conan.io (manifest-mode dependency truth)
 ---
 
 ## What it is
