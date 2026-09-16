@@ -14,10 +14,18 @@ tag vX.Y.Z ───► publish.yml: tag == Cargo.toml version? not already on c
                      cargo publish --dry-run ──► cargo publish
 ```
 
+A tag the bot pushes with `GITHUB_TOKEN` raises no `push` event (GitHub's
+recursion guard), so `release.yml` ends by `gh workflow run publish.yml
+--ref vX.Y.Z` — `workflow_dispatch` is the one event that guard allows. A
+hand-pushed tag still triggers `publish.yml` directly. Either way the
+publish is idempotent: an already-published version is skipped.
+
 ## First release (by hand, once)
 
 `bump-version.sh` refuses to invent a version: with no prior `v*` tag it
-exits 0 ("tag v0.1.0 by hand"). So the first release is:
+exits 0 ("tag v0.1.0 by hand"). So the first release is (history: v0.1.0
+was tagged 2026-09-16; the first crates.io version is 0.2.0, minted by the
+bot from the first `feat:` merge after it):
 
 ```sh
 git tag -a v0.1.0 -m "pheobe v0.1.0"
