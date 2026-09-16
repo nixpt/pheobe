@@ -141,6 +141,44 @@ machines.** Findings and decisions:
    payload for the parent's debugger view). Deferred until a consumer
    asks for it.
 
+### Industry check (web, 2026) — the ladder and the decision table
+
+The broader picture confirms the decline and sharpens two points:
+
+- **"Loops are simple graphs"** (LangChain, *3 Years of Graph
+  Engineering*; 65M+ monthly LangGraph downloads): a loop is a directed,
+  cyclic graph — so a loop-based agent isn't anti-graph, it's the
+  simplest rung on the prompt → context → harness → loop → graph ladder.
+  The industry decision table agrees: *"one task, one verifier, same
+  retry path → single loop — topology overhead wins."* That is pheobe's
+  exact shape. Graphs earn their cost when responsibilities diverge,
+  finish criteria differ per node, or fan-out/fan-in + approval gates
+  are normal — which is **the parent's** domain (foreman dispatching
+  several pheobes), not pheobe's.
+- **"Coding agents as nodes inside a larger graph is a newly practical
+  pattern"** (LangChain) — pheobe is designed to be exactly that node:
+  self mode is one worker-callable unit; the parent owns topology. This
+  validates the mayfly-style no-recursive-spawning rule.
+- **Plan-DAG upgrade path, concretized:** the Graph Harness paper
+  (arXiv 2604.11378) — a scheduler-theoretic formalization separating
+  planning/execution/recovery with immutable plan versions and a bounded
+  escalation protocol — positions static-DAG execution for *"engineering
+  tasks where the dependency structure can be articulated upfront."*
+  pheobe adopts the paper's vocabulary, not its engine: `.pheobe/
+  plan.json` may grow optional `depends_on` per step (validated by the
+  plan_tracker tool, cycle-checked with polydex's idiom) so a parent
+  that fanned out several pheobe nodes can consume pheobe's plan as a
+  sub-DAG. Wave-based parallel execution of steps is explicitly out of
+  scope for a single worker.
+- **Steer, don't re-architect:** OpenCode-GraphAgent (a DAG-of-child-
+  agents plugin for opencode) and the weardo/harness pattern (planner +
+  generator + evaluator waves, circuit-breaker stagnation detection,
+  worktree-isolated parallel fleet) are parent-side orchestrators —
+  pheobe's counterpart obligations stay: honest verdicts in the report
+  (`ACCEPT`-grade evidence: test output, diffs), bounded iteration
+  (aging ladder ≈ their circuit breaker), and clean resume semantics
+  (branch + plan.json ≈ their checkpoint).
+
 ## Task schema (v0)
 
 ```json

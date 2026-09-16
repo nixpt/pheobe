@@ -20,6 +20,12 @@ pub struct Step {
     /// Unverified assumptions recorded here, never argued away (record-doubts).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub doubts: Vec<String>,
+    /// Optional dependency edges on earlier step indices (0-based). A step
+    /// with unsatisfied deps must not start. Future: a parent fanning out
+    /// several pheobe nodes can consume this plan as a sub-DAG (Graph
+    /// Harness vocabulary: immutable per run, wave-ordered by the parent).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub depends_on: Vec<u32>,
 }
 
 pub fn path_in(worktree: &Path) -> PathBuf {

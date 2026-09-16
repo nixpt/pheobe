@@ -41,7 +41,7 @@ fn plan_roundtrips() {
     std::fs::create_dir_all(&dir).unwrap();
     let p = plan::Plan {
         task: "x".into(),
-        steps: vec![plan::Step { desc: "write the parser".into(), status: "todo".into(), doubts: vec!["assumes API shape".into()] }],
+        steps: vec![plan::Step { desc: "write the parser".into(), status: "todo".into(), doubts: vec!["assumes API shape".into()], depends_on: vec![] }],
     };
     plan::save(&dir, &p).unwrap();
     let loaded = plan::load(&dir).unwrap().unwrap();
@@ -363,4 +363,22 @@ fn issue03_existing_branch_suffixed_not_reused() {
     let b3 = crate::worktree::next_free_branch(&root, "pheobe/fresh").unwrap();
     assert_eq!(b3, "pheobe/fresh");
     let _ = std::fs::remove_dir_all(&root);
+}
+
+/// Loops/graphs research: plan steps gain optional `depends_on` edges —
+/// a parent that fanned out several pheobe nodes can consume this plan as
+/// a sub-DAG. Validation lives in the plan_tracker tool, not an engine.
+#[test]
+fn plan_steps_carry_dependency_edges() {
+    let steps: Vec<plan::Step> = serde_json::from_str(
+        r#"[
+        {"desc": "add module", "status": "done"},
+        {"desc": "wire CLI flag", "status": "todo", "depends_on": [0]},
+        {"desc": "tests", "status": "todo", "depends_on": [0, 1]}
+    ]"#,
+    )
+    .unwrap();
+    assert!(steps[0].depends_on.is_empty());
+    assert_eq!(steps[1].depends_on, vec![0]);
+    assert_eq!(steps[2].depends_on, vec![0, 1]);
 }
