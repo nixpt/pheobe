@@ -16,10 +16,12 @@ dcp: DCP/1.0
 - Coordinate live through `scripts/pheobe-sync` (`read --tail 30` on arrival, `claim` before overlapping edits, `done` at handoff). Several agents work this repo at once.
 - Planned work is a `PHEOBE-N` ticket in `.jagent/planning/tickets/`; observed defects are `.jagent/issues/NN-*.md`; the board is `.jagent/planning/TASKS.md`.
 - The handoff report is the contract. Mechanical fields (`branch`, `commits`, `tests`) are always computed by pheobe, never taken from a model's prose.
+- `CLAUDE.md` / `AGENTS.md` are generated from this file (`dejavue export --target claude|codex --replace`); fix this file and regenerate, never the adapter file.
 
 ## Build / Test
 
-- `cargo test` (all tests; adapter tests exec shell shims — issue 10 ETXTBSY flake under parallel load), `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check`, `cargo package --no-verify`. CI (`ci.yml`) runs exactly those; `release.yml` runs them again before any version bump.
+- `cargo test` (148 tests; adapter tests exec shell shims — issue 10 ETXTBSY flake under parallel load), `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check`, `cargo package --no-verify`. CI (`ci.yml`) runs exactly those; `release.yml` runs them again before any version bump.
+- Version moves with the work: a `feat:` merge to `main` mints a minor, `fix:` a patch, `!`/`BREAKING CHANGE` a major, everything else nothing; the tag is then published to crates.io by `publish.yml` over OIDC. Never hand-edit `version` in `Cargo.toml` (`docs/RELEASING.md`).
 - No path or git deps — the crate must build from its own tarball (`cargo publish --dry-run`).
 
 ## Architecture Map
