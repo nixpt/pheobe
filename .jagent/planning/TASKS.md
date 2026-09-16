@@ -9,7 +9,7 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 ## P0 — Build & Core Health
 
 - [x] `cargo build --release` clean
-- [x] `cargo test` green — 144 tests (`src/tests.rs` + per-module tests)
+- [x] `cargo test` green — 148 tests (`src/tests.rs` + per-module tests)
 - [x] `cargo clippy --all-targets -- -D warnings` + `cargo fmt --check` clean (PHEOBE-20)
 - [x] CI: `.github/workflows/ci.yml` (fmt, clippy, test, package) + release gate (PHEOBE-20)
 - [x] **issue 01** — allowlist off-by-one on the first porcelain line (Done, PHEOBE-3)
@@ -79,6 +79,7 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 - [x] promoted 2026-09-16: `nixpt/pheobe` public, v0.1.0 hand-tagged, v0.2.0 minted by release.yml, **pheobe 0.2.0 on crates.io**
 - [x] PHEOBE-30 — release.yml dispatches publish.yml at the minted tag (bot tags raise no push event)
 - [x] PHEOBE-31 — `pheobe doctor` prints compiled version vs crates.io / github tags
+- [x] PHEOBE-32 — `pheobe update` (`cargo install pheobe --locked --force`; git fallback)
 - [ ] configure crates.io Trusted Publishing for `publish.yml`, then drop the `CARGO_REGISTRY_TOKEN` secret
 - [ ] decide whether the `/workspace/external/…` provenance citations in `adopt/` and
       `knowledge/` should ship in the crate as-is (PHEOBE-20 non-goal, flagged)

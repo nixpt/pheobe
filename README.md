@@ -23,6 +23,8 @@ adopter's LLM ──► pheobe host setup/finish + protocol          (host mode)
 ## Install
 
 ```sh
+cargo install pheobe            # crates.io
+pheobe update                   # later upgrades (same cargo install)
 cargo install --path .          # from a checkout
 ```
 
@@ -87,6 +89,7 @@ no `manual` — a run never ends on vibes.
 | `pheobe learn …` | closed-loop lesson store |
 | `pheobe check …` | named working-state snapshots |
 | `pheobe doctor` | version vs crates.io/github tags, endpoint, knowledge drive, worktree primitives |
+| `pheobe update` | install a newer pheobe from crates.io (`--git` if unpublished); `--check` / `--force` |
 
 ## Configuration
 

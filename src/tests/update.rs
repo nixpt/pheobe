@@ -1,6 +1,9 @@
-//! PHEOBE-31: doctor version probe (fake channel, no live net).
+//! PHEOBE-31: doctor version probe; PHEOBE-32: cargo install argv.
 
-use crate::update::{check, parse_crates_io, parse_github_tags, Probe, Source, Status};
+use crate::update::{
+    cargo_install_args, check, parse_crates_io, parse_github_tags, should_install, Probe, Source,
+    Status, CRATE, GIT_URL,
+};
 use anyhow::Result;
 
 struct Fake {
@@ -112,4 +115,43 @@ fn status_line_never_panics_on_empty_local() {
         unreachable: true,
     };
     assert!(s.line().contains("unreachable"));
+}
+
+#[test]
+fn install_args_crates_io() {
+    let s = check("0.2.0", &fake(Ok(Some("0.3.0")), Ok(None)));
+    assert_eq!(
+        cargo_install_args(&s).join(" "),
+        format!("install {CRATE} --locked --force")
+    );
+}
+
+#[test]
+fn install_args_git_tag_when_crate_unpublished() {
+    let s = check("0.1.0", &fake(Ok(None), Ok(Some("v0.2.0"))));
+    assert_eq!(
+        cargo_install_args(&s).join(" "),
+        format!("install --git {GIT_URL} --tag v0.2.0 --locked --force")
+    );
+}
+
+#[test]
+fn install_args_git_head_when_nothing_published() {
+    let s = check("0.1.0", &fake(Ok(None), Ok(None)));
+    assert_eq!(
+        cargo_install_args(&s).join(" "),
+        format!("install --git {GIT_URL} --locked --force")
+    );
+}
+
+#[test]
+fn should_install_only_when_behind_or_forced() {
+    let behind = check("0.1.0", &fake(Ok(Some("0.2.0")), Ok(None)));
+    assert!(should_install(&behind, false).unwrap());
+    let current = check("0.2.0", &fake(Ok(Some("0.2.0")), Ok(None)));
+    assert!(!should_install(&current, false).unwrap());
+    assert!(should_install(&current, true).unwrap());
+    let down = check("0.2.0", &fake(Err("down"), Err("down")));
+    let err = format!("{:#}", should_install(&down, true).unwrap_err());
+    assert!(err.contains("unreachable"), "got {err}");
 }

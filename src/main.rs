@@ -62,8 +62,17 @@ enum Cmd {
         #[command(subcommand)]
         cmd: CheckCmd,
     },
-    /// Check the environment: endpoint, worktree primitives, optional tools
+    /// Check the environment: version vs public channel, endpoint, primitives
     Doctor,
+    /// Install a newer pheobe from crates.io (`--git` if the crate is unpublished)
+    Update {
+        /// Report only; exit 1 if an update is available
+        #[arg(long)]
+        check: bool,
+        /// Reinstall even when already current
+        #[arg(long)]
+        force: bool,
+    },
     /// ACP (Agent Client Protocol) server over stdio (PHEOBE-17). A dispatch
     /// prompt carrying a pheobe task JSON starts a run; progress streams as
     /// session/update notifications and the report JSON returns as the final
@@ -192,6 +201,7 @@ fn run_cmd() -> Result<()> {
         Cmd::Adopt { cmd } => cmd_adopt(cmd),
         Cmd::Check { cmd } => cmd_check(cmd),
         Cmd::Doctor => cmd_doctor(),
+        Cmd::Update { check, force } => cmd_update(check, force),
         Cmd::Acp { stdio: _ } => cmd_acp(),
         Cmd::Host { cmd } => cmd_host(cmd),
     }
@@ -433,6 +443,14 @@ fn cmd_doctor() -> Result<()> {
                 "missing".to_string()
             }
         );
+    }
+    Ok(())
+}
+
+fn cmd_update(check: bool, force: bool) -> Result<()> {
+    let code = update::run(check, force)?;
+    if code != 0 {
+        std::process::exit(code);
     }
     Ok(())
 }

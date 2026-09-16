@@ -1,14 +1,16 @@
-//! Public-channel version probe for `pheobe doctor`.
+//! Public-channel version probe (`pheobe doctor`) and in-place upgrade
+//! (`pheobe update`).
 //!
 //! crates.io when the crate exists; otherwise the newest `v*` git tag on
-//! `nixpt/pheobe`. Tags exist today; GitHub Release objects may not
-//! (`/releases/latest` 404s). Network failure never fails doctor.
+//! `nixpt/pheobe`. `pheobe update` spawns `cargo install` — it does not
+//! download GitHub Release assets (bro's private-repo path).
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::time::Duration;
 
 pub const CRATE: &str = "pheobe";
 pub const REPO: &str = "nixpt/pheobe";
+pub const GIT_URL: &str = "https://github.com/nixpt/pheobe";
 
 const CRATES_URL: &str = "https://crates.io/api/v1/crates/pheobe";
 const TAGS_URL: &str = "https://api.github.com/repos/nixpt/pheobe/tags";
@@ -153,6 +155,78 @@ pub fn check(local: &str, probe: &dyn Probe) -> Status {
 
 pub fn current() -> Status {
     check(env!("CARGO_PKG_VERSION"), &Live)
+}
+
+/// `cargo` argv after the binary name. crates.io crate when that is the
+/// channel; otherwise `--git` pinned to the tag (or HEAD if none).
+pub fn cargo_install_args(status: &Status) -> Vec<String> {
+    match &status.remote {
+        Some(ch) if ch.source == Source::CratesIo => vec![
+            "install".into(),
+            CRATE.into(),
+            "--locked".into(),
+            "--force".into(),
+        ],
+        Some(ch) => vec![
+            "install".into(),
+            "--git".into(),
+            GIT_URL.into(),
+            "--tag".into(),
+            format!("v{}", ch.version),
+            "--locked".into(),
+            "--force".into(),
+        ],
+        None => vec![
+            "install".into(),
+            "--git".into(),
+            GIT_URL.into(),
+            "--locked".into(),
+            "--force".into(),
+        ],
+    }
+}
+
+/// Whether `pheobe update` should spawn cargo. Unreachable is an error so
+/// we never install blind. Already-current is a no-op unless `force`.
+pub fn should_install(status: &Status, force: bool) -> Result<bool> {
+    if status.unreachable {
+        anyhow::bail!("channel unreachable — not running cargo install");
+    }
+    if force {
+        return Ok(true);
+    }
+    Ok(status.update_available())
+}
+
+/// Doctor-identical probe, then optionally `cargo install`. Returns the
+/// process exit code for `--check` (1 = update available).
+pub fn run(check_only: bool, force: bool) -> Result<i32> {
+    let status = current();
+    println!("{:14} {}", "pheobe:", status.line());
+    if check_only {
+        return Ok(if status.update_available() { 1 } else { 0 });
+    }
+    if !should_install(&status, force)? {
+        if status.remote.is_none() {
+            println!("no public version yet — pass --force to install from git HEAD");
+        } else {
+            println!("already current — pass --force to reinstall");
+        }
+        return Ok(0);
+    }
+    let args = cargo_install_args(&status);
+    eprintln!("$ cargo {}", args.join(" "));
+    match std::process::Command::new("cargo").args(&args).status() {
+        Ok(s) if s.success() => {
+            println!("installed. restart pheobe to use the new binary.");
+            Ok(0)
+        }
+        Ok(s) => anyhow::bail!("cargo install failed ({s})"),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => anyhow::bail!(
+            "cargo not on PATH — install Rust (https://rustup.rs) then `cargo install pheobe`"
+        ),
+        Err(e) => Err(e).context("spawn cargo"),
+    }
 }
 
 pub fn parse_crates_io(body: &str) -> Option<String> {
