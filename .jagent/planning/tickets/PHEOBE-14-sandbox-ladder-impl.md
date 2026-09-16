@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | PHEOBE-14 |
 | **Priority** | P2 |
-| **Status** | Backlog |
+| **Status** | Done |
 | **Assignee** | unassigned |
 | **Dependencies** | none |
 | **Estimated effort** | M |
@@ -34,3 +34,14 @@ task schema lacks the `sandbox` field entirely.
       always on, paths_allow, root jail) — one shared enforcement point,
       tested with a fake bwrap script proving the binds on the command
       line.
+
+## Resolution (merged 2026-09-16)
+
+sandbox.rs: Tier enum (strict/moderate/free), bwrap arg builder
+(bind-try ro-binds of /usr /bin /sbin /lib /lib64, --dev/--proc/--tmpfs,
+worktree --bind, --chdir), strict allowlist (test/build/done_when prefixes).
+task.rs `sandbox` field + effective_sandbox() (PHEOBE_SANDBOX env always
+wins). Fail-closed: strict w/o bwrap = blocked:no_sandbox at intake via
+ensure_at_intake. Moderate w/o bwrap = safe degradation (destructive guard
+stays on). LIVE bwrap proof on this box: --unshare-net blocks curl, only
+loopback visible; worktree writable. 8 sandbox_ tests.

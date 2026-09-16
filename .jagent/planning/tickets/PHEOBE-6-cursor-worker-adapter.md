@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | PHEOBE-6 |
 | **Priority** | P2 |
-| **Status** | Backlog |
+| **Status** | Done |
 | **Phase** | M0 — the loop exists; exit gate must pass a real run |
 | **Assignee** | unassigned |
 | **Dependencies** | PHEOBE-9 (Worker trait) |
@@ -47,3 +47,16 @@ sources `docs-*.md`.
 - [ ] `pheobe adopt cursor` prints the `local.agents` pheobe subagent def
       (no-recursion: `task` disabled in the subagent's own toolset) + the
       hook config snippet.
+
+## Resolution (merged 2026-09-16)
+
+CLI path implemented (decision recorded in the ticket): spawns
+`cursor-agent -p --output-format json [flags] <prompt>`, flags default
+`--yolo --trust` (mayfly-proven), `PHEOBE_CURSOR_FLAGS` replaces-not-appends
+(claude-adapter convention), `PHEOBE_CURSOR_TIMEOUT_SECS` (default 3600).
+Defensive stdout parse: single JSON object, per-line stream, or the whole
+stdout as prose. usage.tokens / usage.total_tokens → budget estimator;
+report-contract final message → json_tail. Sandbox tier mapping onto
+`--sandbox` left for the @cursor/sdk follow-up (getUsage real-USD + steer).
+8 cursor_ tests; registry now resolves cursor. Live smoke deferred:
+CURSOR_API_KEY absent on this box.

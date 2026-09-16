@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | PHEOBE-11 |
 | **Priority** | P2 |
-| **Status** | Backlog |
+| **Status** | Done |
 | **Assignee** | unassigned |
 | **Dependencies** | none |
 | **Estimated effort** | M |
@@ -37,3 +37,15 @@ on any fleet box upgrades from text coordinates to structural ones.
 - [ ] Tests use a fake `polydex`/`code-atlas` script on a temp PATH to
       prove gate + fallback + stale-note behavior without the real
       binaries.
+
+## Resolution (merged 2026-09-16)
+
+structint.rs: deprecation-safe detection (`polydex` OR `crush-symbols`),
+index_status freshness gate (`polydex status --json` → exists + drift),
+skeleton/callers/impact/enclosing/affected_tests/hotspots/languages
+wrappers, orient_brief (hotspots + languages). tools.rs: sym_* read tools
+registered only when polydex on PATH; atlas_edit registered only when
+code-atlas exists (gate-ready, never exercised on this box — skip-and-note).
+main.rs orient appends the structural brief after the knowledge drive.
+8 structint_ tests (PATH_LOCK-serialized). code-atlas half stays
+gate-ready by design until its binary ships.
