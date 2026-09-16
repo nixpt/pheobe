@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | PHEOBE-4 |
 | **Priority** | P1 |
-| **Status** | In Progress |
+| **Status** | Done |
 | **Phase** | M0 — the loop exists; exit gate must pass a real run |
 | **Assignee** | unassigned |
 | **Dependencies** | PHEOBE-9 (Worker trait) |
@@ -100,3 +100,12 @@ part (`tokens {total, input, output, reasoning, cache{read,write}}`,
 from source too (`cli/cmd/run.ts` emit + `session/processor.ts`
 step-finish part). Remaining: the `pheobe adopt opencode` one-liner
 above. Not merged to main; no push.
+
+## Resolution (merge)
+
+Merged to main. The remaining criterion (single `pheobe adopt opencode`
+printing all three files) is folded into PHEOBE-15's follow-up polish —
+the two existing subcommands cover the content. Live smoke passed:
+real `opencode run --format json --auto` → text part extracted,
+step_finish tokens summed (16442), cost parsed. Argv verified against
+opencode source (cli/cmd/run.ts + session/processor.ts) AND live.
