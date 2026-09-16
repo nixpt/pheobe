@@ -4,7 +4,7 @@
 |-------|-------|
 | **ID** | PHEOBE-16 |
 | **Priority** | P3 |
-| **Status** | Backlog |
+| **Status** | Done |
 | **Assignee** | unassigned |
 | **Dependencies** | PHEOBE-10 (loop hardening touches the same files) |
 | **Estimated effort** | S |
@@ -30,3 +30,21 @@ a swap, not a fork.
       the mapping (DESIGN.md §"Borrowed: joker learning" already
       specifies the semantics).
 - [ ] Existing learn tests pass unchanged against the trait.
+
+## Resolution (merged 2026-09-16)
+
+`src/memory.rs`: `MemoryStore` trait (`session_begin/end`, `log_event`,
+`store_nudge`, `nudges_for`) + three impls. `JsonlStore` = the prior
+learning JSONL (moved verbatim). `NullStore` = PHEOBE_MEMORY=none no-ops.
+`HostStore` = joker-mcp MCP stdio delegation: binary probe via PATH
+resolvability (joker-mcp `--help` exits 1 as an MCP server won't run
+that way), then a real MCP handshake (initialize ack → notifications/
+initialized → tools/call) with a per-line response reader and 5s
+timeout; store → joker_store_fact, recall → joker_recall_facts filtered
+to `nudge[<repo>]`. Any failure → local fallback + ⚠ doubt note.
+
+`learn.rs` free functions now delegate to `memory::current()`; `main.rs`
+calls `learn::init()` at run start. Existing learn tests pass unchanged
+(only env serialization added via a shared `env_lock`). 88 tests green.
+Live proof: `PHEOBE_MEMORY=host pheobe learn nudge/nudges` round-trips
+through the real joker-mcp on this box.
