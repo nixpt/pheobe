@@ -83,7 +83,7 @@ no `manual` — a run never ends on vibes.
 | `pheobe host finish <task.json>` | host supervisor: `done_when` + allowlist in `--worktree` (cwd default); JSON; exit 0/1 |
 | `pheobe adopt <claude\|claude-sdk\|opencode\|opencode-self\|codex\|cursor\|kimi\|agy>` | print that harness's adoption kit |
 | `pheobe acp --stdio` | Agent Client Protocol server over stdio (e.g. `bro synapse dispatch -- pheobe acp --stdio`) |
-| `pheobe ctx …` | knowledge drive: brief the prompt for a repo (`knowledge/` ships the seed corpus) |
+| `pheobe ctx seed` / `ctx brief --for-repo <dir>` / `ctx list` | knowledge drive: land the built-in corpus in `~/.pheobe/knowledge`, then brief the prompt with the entries that match a repo |
 | `pheobe learn …` | closed-loop lesson store |
 | `pheobe check …` | named working-state snapshots |
 | `pheobe doctor` | endpoint, worktree primitives, optional tools |

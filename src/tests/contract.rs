@@ -121,8 +121,9 @@ fn ctx_brief_carries_the_preamble() {
         last_verified: Some("2026-01-01".into()),
         stale: false,
         path: "/x/tokio.md".into(),
+        tags: vec![],
     };
-    let b = crate::knowledge::brief(&[e]);
+    let b = crate::knowledge::brief(&[e], None);
     assert!(b.contains("THIS IS RIGHT AND YOU ARE WRONG"));
     assert!(b.contains("Do not guess an API into existence"));
     assert!(b.contains("### tokio"));

@@ -2,7 +2,7 @@
 //! stages live (intake, orient assembly, verify gate, worktree, report); the
 //! model turn is the one unwired piece, marked clearly.
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
 use pheobe::{checkpoint, host, knowledge, learn, report, run, task, verify, worktree};
 use std::path::{Path, PathBuf};
@@ -105,6 +105,13 @@ enum CtxCmd {
         /// Emit entries relevant to this repo
         #[arg(long)]
         for_repo: Option<String>,
+    },
+    /// Write the built-in seed corpus into the user drive (~/.pheobe/knowledge
+    /// or $PHEOBE_KNOWLEDGE_DIR); existing entries are kept unless --force
+    Seed {
+        /// Overwrite entries that already exist
+        #[arg(long)]
+        force: bool,
     },
 }
 
@@ -264,10 +271,26 @@ fn cmd_ctx(cmd: CtxCmd) -> Result<()> {
             let repo = for_repo.as_deref().map(Path::new);
             let entries = knowledge::load_all(repo)?;
             if entries.is_empty() {
-                eprintln!("research drive is empty — seed ~/.pheobe/knowledge/*.md");
+                eprintln!("research drive is empty — run `pheobe ctx seed`");
                 return Ok(());
             }
-            print!("{}", knowledge::brief(&entries));
+            print!("{}", knowledge::brief(&entries, repo));
+        }
+        CtxCmd::Seed { force } => {
+            let dir = knowledge::drive_roots(None)
+                .into_iter()
+                .next()
+                .context("no user drive: set HOME or PHEOBE_KNOWLEDGE_DIR")?;
+            let (written, kept) = knowledge::seed(&dir, force)?;
+            println!(
+                "seeded {}: {written} written, {kept} kept{}",
+                dir.display(),
+                if kept > 0 && !force {
+                    " (--force to overwrite)"
+                } else {
+                    ""
+                }
+            );
         }
         CtxCmd::List => {
             let entries = knowledge::load_all(None)?;
@@ -377,6 +400,16 @@ fn cmd_doctor() -> Result<()> {
             "configured (PHEOBE_BASE_URL + PHEOBE_MODEL)"
         } else {
             "NOT configured"
+        }
+    );
+    let n = knowledge::load_all(None).map(|e| e.len()).unwrap_or(0);
+    println!(
+        "{:14} {}",
+        "knowledge:",
+        if n > 0 {
+            hint_ok(&format!("{n} entries (research drive)"))
+        } else {
+            "empty — run `pheobe ctx seed`".to_string()
         }
     );
     for (name, hint) in [
