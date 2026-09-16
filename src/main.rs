@@ -142,6 +142,7 @@ fn run_cmd() -> Result<()> {
 }
 
 fn cmd_run(task_file: &str, branch: Option<String>) -> Result<()> {
+    learn::init(); // PHEOBE_MEMORY=none|local|host selects the store (PHEOBE-16)
     let task = task::load(task_file)?;
     // sandbox intake gate (PHEOBE-14): an un-deliverable strict tier is a
     // blocked:no_sandbox BEFORE the loop, never a mid-run surprise

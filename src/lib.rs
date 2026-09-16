@@ -11,6 +11,7 @@ pub mod fmt;
 pub mod knowledge;
 pub mod learn;
 pub mod llm;
+pub mod memory;
 pub mod plan;
 pub mod report;
 pub mod sandbox;
