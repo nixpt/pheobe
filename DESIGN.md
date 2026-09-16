@@ -2,7 +2,10 @@
 
 > A coding workhorse with no face. Task in, worktree branch out.
 
-**Status:** design doc — no code yet. Scaffold after the contract below is ratified.
+**Status:** implemented — v0.1.0, `cargo install pheobe` (crates.io-ready
+metadata, no path-deps). Remote: `nixpt/pheobe` (GitHub). The contract below
+is the shipped behavior, ratified by 100 green tests and live dispatches
+via bro's ACP (`bro synapse dispatch -- pheobe acp --stdio`).
 
 ## Problem
 
