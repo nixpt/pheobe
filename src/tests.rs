@@ -79,6 +79,7 @@ fn ctx_brief_carries_the_preamble() {
 
 #[test]
 fn learn_disabled_by_default_and_sessions_append_when_enabled() {
+    let _lock = crate::memory::tests::env_lock().lock().unwrap();
     // default: off
     assert!(!crate::learn::enabled());
 
