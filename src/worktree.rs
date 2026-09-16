@@ -29,46 +29,47 @@ fn is_source_checkout(repo: &Path) -> bool {
     repo.join(".git").is_dir()
 }
 
+/// Issue 03: a pre-existing `pheobe/<slug>` branch must never be checked out
+/// silently (stale base). Refuse-after-suffix: `<base>-2`, `-3`, … first free
+/// wins; also prune stale registrations so `git worktree add` can't fail with
+/// "missing but already registered worktree" with no hint.
+pub fn next_free_branch(repo: &Path, base: &str) -> Result<String> {
+    let _ = run(Command::new("git").arg("-C").arg(repo).args(["worktree", "prune"]));
+    for i in 1..100 {
+        let candidate = if i == 1 { base.to_string() } else { format!("{base}-{i}") };
+        let exists = Command::new("git").arg("-C").arg(repo)
+            .args(["show-ref", "--verify", "--quiet", &format!("refs/heads/{candidate}")])
+            .status()
+            .is_ok_and(|s| s.success());
+        if !exists {
+            return Ok(candidate);
+        }
+    }
+    bail!("branch '{base}' and 99 suffixed variants all exist — clean up with `kitchen list`")
+}
+
 /// Provision an isolated working copy. Returns (worktree path, branch).
 pub fn provision(repo: &Path, branch: &str) -> Result<(PathBuf, String)> {
     if !is_source_checkout(repo) {
         // already a worktree — find the source repo and branch from it
         bail!("given repo is already a worktree; pass the source repo (kitchen resolves this)")
     }
-    if kitchen_available() {
-        return provision_kitchen(repo, branch);
-    }
+    let branch = next_free_branch(repo, branch)?;
     if buckets_available() {
-        let wt = run(Command::new("buckets")
-            .args(["worktree", "create", &repo.display().to_string(), branch]))?;
-        let wt = wt.lines().last().context("buckets printed nothing")?.trim().to_string();
-        if !Path::new(&wt).is_dir() {
-            bail!("buckets worktree create did not produce a path: {wt}");
-        }
-        return Ok((PathBuf::from(wt), branch.to_string()));
+        return provision_buckets(repo, &branch);
     }
     // plain git fallback
     let wt = repo.join(format!("../{}-{}", repo.file_name().and_then(|n| n.to_str()).unwrap_or("repo"), branch.replace('/', "-")));
     run(Command::new("git").arg("-C").arg(repo)
-        .args(["worktree", "add", &wt.to_string_lossy(), "-b", branch]))?;
-    Ok((wt, branch.to_string()))
+        .args(["worktree", "add", &wt.to_string_lossy(), "-b", &branch]))?;
+    Ok((wt, branch))
 }
 
-fn kitchen_available() -> bool {
-    which("kitchen")
-}
 fn buckets_available() -> bool {
     which("buckets")
 }
 fn which(bin: &str) -> bool {
     Command::new("sh").args(["-c", &format!("command -v {bin} >/dev/null 2>&1")]).status().is_ok_and(|s| s.success())
-}
-
-fn provision_kitchen(repo: &Path, branch: &str) -> Result<(PathBuf, String)> {
-    // kitchen enter branches agent/<agent>/<ticket>; we want the branch name we
-    // were given, so use buckets directly for the worktree but reuse kitchen's
-    // target-dir discipline via env (kept simple in v0: buckets is the engine).
-    provision_buckets(repo, branch)
 }
 
 fn provision_buckets(repo: &Path, branch: &str) -> Result<(PathBuf, String)> {
@@ -81,19 +82,52 @@ fn provision_buckets(repo: &Path, branch: &str) -> Result<(PathBuf, String)> {
     Ok((PathBuf::from(last), branch.to_string()))
 }
 
-pub fn status_dirty(wt: &Path) -> Result<bool> {
-    let status = run(Command::new("git").arg("-C").arg(wt).args(["status", "--porcelain"]))?;
-    Ok(!status.trim().is_empty())
+/// `git status --porcelain` lines, RAW — no trim. Issue 01: trimming the
+/// whole output eats the leading space of the first line, and `line[3..]`
+/// then yields `alc.py` for ` M calc.py`. Every real run's first status
+/// entry is the edited file, so this exact mangling blocked the exit gate.
+pub fn status_porcelain(wt: &Path) -> Result<Vec<String>> {
+    let out = Command::new("git").arg("-C").arg(wt).args(["status", "--porcelain"]).output()?;
+    if !out.status.success() {
+        bail!("git status failed: {}", String::from_utf8_lossy(&out.stderr).trim());
+    }
+    let txt = String::from_utf8_lossy(&out.stdout);
+    Ok(txt.lines().map(|l| l.to_string()).filter(|l| !l.is_empty()).collect())
 }
 
-/// Pre-commit scope check: staged/unstaged paths must sit inside paths_allow.
-pub fn check_allowlist(wt: &Path, paths_allow: &[String]) -> Result<Vec<String>> {
-    let status = run(Command::new("git").arg("-C").arg(wt)
-        .args(["status", "--porcelain"]))?;
+/// Extract the path from one raw porcelain line: `XY<space>path`, rename
+/// `XY<space>old -> new` → the NEW path, quoted paths dequoted.
+fn porcelain_path(line: &str) -> Option<String> {
+    let bytes = line.as_bytes();
+    if bytes.len() < 4 {
+        return None;
+    }
+    let rest = &line[3..];
+    let path = if rest.contains(" -> ") {
+        rest.rsplit(" -> ").next().unwrap_or(rest)
+    } else {
+        rest
+    };
+    let path = path.trim();
+    let path = path.strip_prefix('"').and_then(|p| p.strip_suffix('"')).unwrap_or(path);
+    if path.is_empty() {
+        None
+    } else {
+        Some(path.to_string())
+    }
+}
+
+/// Pre-commit scope check (issue-02 semantics): the allowlist is about what
+/// the model *edited*. `.pheobe/` is pheobe's own state and never a
+/// violation; untracked (`??`) entries are bash-run byproducts, reported
+/// separately as `byproducts` — they cannot silently enter the commit
+/// because `commit()` stages by pathspec, never `add -A`.
+pub fn check_allowlist(wt: &Path, paths_allow: &[String]) -> Result<(Vec<String>, Vec<String>)> {
     let mut violations = vec![];
-    for line in status.lines() {
-        let path = line.get(3..).unwrap_or("").trim();
-        if path.is_empty() {
+    let mut byproducts = vec![];
+    for line in status_porcelain(wt)? {
+        let Some(path) = porcelain_path(&line) else { continue };
+        if path == ".pheobe" || path.starts_with(".pheobe/") {
             continue;
         }
         let inside = paths_allow
@@ -103,15 +137,36 @@ pub fn check_allowlist(wt: &Path, paths_allow: &[String]) -> Result<Vec<String>>
                 path == a || path.starts_with(a)
             });
         if !inside {
-            violations.push(path.to_string());
+            if line.starts_with("??") {
+                byproducts.push(path);
+            } else {
+                violations.push(path);
+            }
         }
     }
-    Ok(violations)
+    Ok((violations, byproducts))
+}
+
+/// Stage for commit — by pathspec when the task has an allowlist (issue 02:
+/// bash-created byproducts like `__pycache__/` must not sneak into the
+/// commit), `.pheobe` excluded unconditionally.
+fn stage(wt: &Path, paths_allow: &[String]) -> Result<()> {
+    if paths_allow.is_empty() {
+        return run(Command::new("git").arg("-C").arg(wt)
+            .args(["add", "-A", "--", ".", ":!/.pheobe"]))
+            .map(|_| ());
+    }
+    let mut args = vec!["add".to_string(), "-A".to_string(), "--".to_string()];
+    for a in paths_allow {
+        args.push(a.trim_end_matches('/').to_string());
+    }
+    args.push(":!/.pheobe".into());
+    run(Command::new("git").arg("-C").arg(wt).args(&args)).map(|_| ())
 }
 
 /// Commit with a provenance trailer (borrowed from commit-msg-agent-trailer).
-pub fn commit(wt: &Path, task_id: &str, message: &str) -> Result<String> {
-    run(Command::new("git").arg("-C").arg(wt).args(["add", "-A"]))?;
+pub fn commit(wt: &Path, task_id: &str, message: &str, paths_allow: &[String]) -> Result<String> {
+    stage(wt, paths_allow)?;
     let trailer = format!("Pheobe-Task: {task_id}");
     let hash = run(Command::new("git").arg("-C").arg(wt).args([
         "-c", "user.name=pheobe", "-c", "user.email=pheobe@local",
