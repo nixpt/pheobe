@@ -1061,6 +1061,7 @@ from ttl/budget at intake.
 | `adopt/codex/README.md` + `sdk-snippet.md` | no native subagents — bash-tool invocation | self |
 | `adopt/cursor/def.md` + `pheobe-host.md` | cursor SDK `Agent.create` / IDE `~/.cursor/agents/` / CLI `--sandbox` | host |
 | `adopt/kimi/def.md` | kimi code def + provider env | self |
+| `adopt/agy/README.md` + `skill.md` | Antigravity skill (`.agents/skills/pheobe/SKILL.md`) + subagent def | host |
 | (none) | claude host mode: no kit yet — the opencode host protocol was used as-is in the s457 test; a claude subagent def carrying the same protocol would make it native | host |
 | bro | ACP: `pheobe acp --stdio` ↔ `bro synapse dispatch --` — no kit file, the binary is the kit | self |
 | `adopt/README.md` | the contract every kit wraps | — |

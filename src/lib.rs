@@ -25,6 +25,7 @@ mod tests;
 pub mod tools;
 pub mod verify;
 pub mod worker;
+pub mod worker_agy;
 pub mod worker_claude;
 pub mod worker_codex;
 pub mod worker_cursor;

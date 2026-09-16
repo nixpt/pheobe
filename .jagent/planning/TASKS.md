@@ -66,6 +66,7 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 - [x] PHEOBE-23 — Cursor SDK/CLI alignment: --sandbox mapping, usage/cost parse, file-form kit (cursor)
 - [x] PHEOBE-24 — agent-sync channel: `scripts/pheobe-sync` + `docs/SYNC.md` + RULES §7
 - [x] **PHEOBE-23** — Cursor SDK/CLI alignment (`--sandbox` map, IDE agents kit, `disallowedTools` on AgentOptions)
+- [x] **PHEOBE-25** (`tickets/PHEOBE-25-agy-worker-and-adopt-kit.md`) — AGY worker adapter (`PHEOBE_PROVIDER=agy`) + adoption kit (`adopt/agy/`)
 
 ## W5 — release
 

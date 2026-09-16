@@ -212,6 +212,14 @@ fn provider_registry_resolves_or_errors_clearly() {
         matches!(worker_from_env("kimi"), Ok(Some(_))),
         "kimi = its adapter (PHEOBE-8)"
     );
+    assert!(
+        matches!(worker_from_env("agy"), Ok(Some(_))),
+        "agy = its adapter (PHEOBE-25)"
+    );
+    assert!(
+        matches!(worker_from_env("antigravity"), Ok(Some(_))),
+        "antigravity = its adapter (PHEOBE-25)"
+    );
     let err = match worker_from_env("definitely-not-a-provider") {
         Err(e) => e,
         Ok(_) => panic!("unknown provider must error"),
