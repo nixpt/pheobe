@@ -683,25 +683,61 @@ Env: `PHEOBE_PROVIDER=opencode` (default `openai`),
 `PHEOBE_OPENCODE_MODEL` (mayfly's `MAYFLY_OPENCODE_MODEL` precedent),
 `PHEOBE_OPENCODE_URL` (attach to a running `opencode serve`).
 
-### Surface 3 — subagent defs (host mode kits)
+### Surface 3 — subagent defs (host mode kits) — source-grounded
 
-Two repo-local flavors, both `.opencode/agent/*.md`:
+Read from `/workspace/external/opencode` (reference clone — ground truth
+on disk, don't recall it). What opencode actually provides:
+
+- **The subagent surface is the Task tool + the agent registry.**
+  `Agent.Info` = `{ name, description, mode: "subagent"|"primary"|"all",
+  permission: ruleset, model?, tools?, prompt?, options, steps }`. Agents
+  register from config `agent` sections or repo-local
+  `.opencode/agent/*.md`; the parent spawns them with the Task tool via
+  `subagent_type: "pheobe"`, supports `background: true` (async,
+  notified on completion) and `task_id` resume.
+- **Subagent sessions can't recurse.** `deriveSubagentSessionPermission`
+  (agent/subagent-permissions.ts) inherits the parent's `deny` +
+  `external_directory` rules and defaults `todowrite`/`task` to denied
+  unless the subagent's own ruleset permits them. pheobe's core rule 5
+  (no recursive spawning) is enforced by the host itself when pheobe runs
+  as an opencode subagent.
+- **Subagents are prompt-driven sessions**, not spawned binaries — which
+  is exactly why the self-mode kit is bash-only: the subagent session's
+  whole body is "write the task JSON, run `pheobe run --json`, parse the
+  report".
+- **opencode has native worktrees** (src/worktree): branch
+  `opencode/<name>`, generated with `show-ref --verify` + suffix-on-
+  collision — the exact lesson PHEOBE-3 just fixed, independently
+  confirmed upstream. A later rung in pheobe's worktree ladder when under
+  opencode: kitchen > buckets > opencode worktree (server API) > plain
+  `git worktree add`.
+
+Two flavors, both `.opencode/agent/*.md` (fields per `Agent.Info`):
 
 | file | mode | content |
 |---|---|---|
-| `pheobe.md` | self | bash-only toolset; the agent's job is to write the task JSON and run `pheobe run --json`, then act on the report — opencode is the dispatcher, pheobe's binary is the engine |
+| `pheobe.md` | self | bash-only toolset, `mode: subagent`; the agent writes the task JSON and runs `pheobe run --json`, then acts on the report — opencode is the dispatcher, pheobe's binary is the engine |
 | `pheobe-host.md` | host | opencode's own model runs the pheobe protocol with opencode's own tools (the existing host-agent.md) |
 
 `pheobe adopt opencode` prints both plus the `opencode.jsonc` snippet
-(agent registration + the sandbox mapping below).
+(agent entry with a `permission` ruleset + the sandbox mapping below).
 
 ### Sandbox tier ↔ opencode permissions
+
+Concrete now that the permission system is read from source: the tier maps
+onto the `permission` ruleset an agent def carries (`PermissionV1.Ruleset`
+— patterns × actions `allow|ask|deny`), which the subagent session
+inherits from the parent plus its own:
 
 | pheobe tier | opencode surface |
 |---|---|
 | strict | opencode cannot provide namespace isolation → in self mode only, or opencode itself run inside a `buckets run` bwrap (rare; document, don't default) |
-| moderate | opencode's own permission prompts + `external_directory` allowlist scoped to the worktree + `/tmp` |
+| moderate | the `pheobe` agent def's own `permission` ruleset: bash/edit ask-by-default, `external_directory` allowlisted to the worktree + `/tmp` (the shape the fleet's `~/.config/opencode/opencode.jsonc` already uses, minus the workspace-wide allows) |
 | free | opencode's default config policy — its deny-pattern bash rules are the same lineage as pheobe's safe-exec list (both descend from the 2026-05-15 rules), so `free` under opencode ≈ its shipped guardrails |
+
+Bonus inherited for nothing: opencode's subagent derivation defaults
+`task` to denied, so a pheobe subagent under opencode physically cannot
+fan out — core rule 5 enforced at the host layer.
 
 Degradation rule (unchanged from the sandbox ladder section): host can't
 provide the requested tier → `{ok:false, blocked:"sandbox_unavailable"}`.

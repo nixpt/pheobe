@@ -20,6 +20,25 @@ or a session against a running `opencode serve` via `--attach` / REST
 `/api/session` + `/prompt`). Today only Surface 1 (Zen endpoint as a plain
 `OpenAi` provider) is wired; Surface 2 is design-only.
 
+## Reference (read from /workspace/external/opencode — ground truth on disk)
+
+- `packages/opencode/src/agent/agent.ts` — `Agent.Info` schema:
+  `{ name, description, mode: "subagent"|"primary"|"all", permission:
+  ruleset, model?, tools?, prompt?, options, steps }`.
+- `packages/opencode/src/agent/subagent-permissions.ts` — subagent
+  sessions inherit parent deny + external_directory rules; `task`/
+  `todowrite` denied by default (no recursion for free).
+- `packages/opencode/src/tool/task.ts` — Task tool: `subagent_type`,
+  `background: true` (async + auto-notify), `task_id` resume.
+- `packages/opencode/src/worktree/index.ts` — native worktrees, branch
+  `opencode/<name>`, `show-ref --verify` + suffix-on-collision (same
+  lesson as .jagent issue 03).
+- Server API (probed live, opencode 1.18.31): `/api/health`,
+  `/api/session` (POST), `/api/session/{id}/prompt` (POST),
+  `/api/session/{id}/event` (SSE), `/api/session/{id}/interrupt` —
+  no OpenAI-completions endpoint on the local server; completions only on
+  the hosted Zen endpoint. Surface 2's attach path rides the session API.
+
 ## Success criteria
 
 - [ ] A `Worker` trait exists alongside `Provider` ("one prompt in, the
