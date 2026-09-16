@@ -4,6 +4,7 @@
 
 mod agent_loop;
 mod aging;
+mod agy;
 mod claude;
 mod contract;
 mod cursor;

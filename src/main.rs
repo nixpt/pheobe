@@ -99,6 +99,8 @@ enum AdoptCmd {
     Cursor,
     /// Print the kimi code def + provider config kit (self mode)
     Kimi,
+    /// Print the antigravity (agy) skill and adoption kit
+    Agy,
 }
 
 #[derive(Subcommand, Debug)]
@@ -255,6 +257,10 @@ fn cmd_adopt(cmd: Option<AdoptCmd>) -> Result<()> {
             print!("{}", include_str!("../adopt/cursor/pheobe-host.md"));
         }
         Some(AdoptCmd::Kimi) => print!("{}", include_str!("../adopt/kimi/def.md")),
+        Some(AdoptCmd::Agy) => {
+            print!("{}", include_str!("../adopt/agy/README.md"));
+            print!("{}", include_str!("../adopt/agy/skill.md"));
+        }
     }
     Ok(())
 }

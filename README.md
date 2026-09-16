@@ -3,7 +3,7 @@
 **A coding workhorse with no face. Task in, worktree branch + handoff report out.**
 
 pheobe is a headless coding agent built to be *adopted as a subagent* — by
-another agent harness (Claude Code, opencode, codex, cursor, kimi, bro) or by
+another agent harness (Claude Code, opencode, codex, cursor, kimi, agy, bro) or by
 a human's shell. No TUI, no daemon, no session store. It takes a scoped task,
 does the work in its own git worktree on a fresh branch, verifies the result
 against a mechanical `done_when` gate, and returns one JSON report. It never
@@ -78,7 +78,7 @@ no `manual` — a run never ends on vibes.
 |---|---|
 | `pheobe run <task.json\|->` | the loop, self mode; report on stdout |
 | `pheobe verify <task.json>` | `done_when` + path-allowlist gate only; exit 0/1 (host mode's exit gate) |
-| `pheobe adopt <claude\|claude-sdk\|opencode\|opencode-self\|codex\|cursor\|kimi>` | print that harness's adoption kit |
+| `pheobe adopt <claude\|claude-sdk\|opencode\|opencode-self\|codex\|cursor\|kimi\|agy>` | print that harness's adoption kit |
 | `pheobe acp --stdio` | Agent Client Protocol server over stdio (e.g. `bro synapse dispatch -- pheobe acp --stdio`) |
 | `pheobe ctx …` | knowledge drive: brief the prompt for a repo (`knowledge/` ships the seed corpus) |
 | `pheobe learn …` | closed-loop lesson store |
@@ -92,7 +92,7 @@ Everything is environment-driven; there is no config file.
 | variable | values | default |
 |---|---|---|
 | `PHEOBE_BASE_URL` / `PHEOBE_MODEL` / `PHEOBE_API_KEY` | the self-mode endpoint | — |
-| `PHEOBE_PROVIDER` | `openai` (built-in turn loop) or a worker adapter: `opencode`, `claude`, `codex`, `cursor`, `kimi` | `openai` |
+| `PHEOBE_PROVIDER` | `openai` (built-in turn loop) or a worker adapter: `opencode`, `claude`, `codex`, `cursor`, `kimi`, `agy` | `openai` |
 | `PHEOBE_SANDBOX` | `strict` \| `moderate` \| `free` (bwrap tiers; env wins over the task's `sandbox`) | `moderate` |
 | `PHEOBE_MEMORY` | `none` \| `local` \| `host` (host = a joker-mcp memory store) | `local` |
 | `PHEOBE_<PROVIDER>_BIN` / `_FLAGS` / `_TIMEOUT_SECS` | per-adapter binary, extra flags, wall-clock cap | adapter default |
@@ -103,8 +103,8 @@ Everything is environment-driven; there is no config file.
 contract: Claude Code subagent defs (self and host), an Agent SDK snippet,
 opencode agent defs, a codex bash-tool invocation, a cursor host kit
 (SDK `Agent.create` + IDE `~/.cursor/agents/` + CLI `--sandbox` map), a
-kimi def. `pheobe adopt <name>` prints the kit; `adopt/README.md`
-states the contract every kit wraps.
+kimi def, an Antigravity (`agy`) skill and subagent def. `pheobe adopt <name>`
+prints the kit; `adopt/README.md` states the contract every kit wraps.
 
 ## Design
 

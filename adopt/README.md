@@ -14,6 +14,7 @@ installs the same contract; only the wiring differs per host.
 | codex | self (bash tool) + SDK snippet | `adopt/codex/README.md`, `adopt/codex/sdk-snippet.md` | `pheobe adopt codex` |
 | cursor | host (SDK `Agent.create` + IDE `~/.cursor/agents/` + CLI `--sandbox`) | `adopt/cursor/def.md`, `adopt/cursor/pheobe-host.md` | `pheobe adopt cursor` |
 | kimi | self (config def + provider env) | `adopt/kimi/def.md` | `pheobe adopt kimi` |
+| agy | host (Skill `.agents/skills/pheobe/SKILL.md` + subagent def) | `adopt/agy/README.md`, `adopt/agy/skill.md` | `pheobe adopt agy` |
 
 ## Install
 

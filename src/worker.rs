@@ -86,6 +86,8 @@ const REGISTRY: &[(&str, WorkerFactory)] = &[
     ("codex", crate::worker_codex::worker as WorkerFactory),       // PHEOBE-7
     ("cursor", crate::worker_cursor::worker as WorkerFactory),     // PHEOBE-6
     ("kimi", crate::worker_kimi::worker as WorkerFactory),         // PHEOBE-8
+    ("agy", crate::worker_agy::worker as WorkerFactory),           // PHEOBE-25
+    ("antigravity", crate::worker_agy::worker as WorkerFactory),   // PHEOBE-25 alias
 ];
 
 /// Resolve a `PHEOBE_PROVIDER` name. `Ok(None)` = the built-in per-turn
