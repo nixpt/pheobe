@@ -5,6 +5,7 @@
 //! is not. See DESIGN.md.
 
 pub mod agent;
+pub mod aging;
 pub mod knowledge;
 pub mod learn;
 pub mod llm;

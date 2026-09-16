@@ -67,6 +67,27 @@ schemas are deliberately kept compatible in spirit.
    (`host` mode, mayfly-style inversion — see "Execution modes"). The JSON
    handoff report and the loop stages are identical in both.
 
+## Aging ladder
+
+> Ported from mayfly, *inside* the loop — which is what MAYFLY-2 (aging
+> inject) left parked: pheobe owns its turns, so the injects are real.
+> *(Wired as of PHEOBE-2: `src/aging.rs`, `LoopCfg { ttl, max_usd,
+> usd_per_mtok }`.)*
+
+| life used | state | behavior |
+|-----------|-------|----------|
+| 0–50% | alive | normal work |
+| 50–75% | warn | inject "narrow to done_when only" once |
+| 75–100% | narrowing | inject "final push — verify or hand off" once |
+| 100% | expired | hard stop; report `ttl_exceeded` |
+
+A run that hits its deadline without done_when is a **task-design failure**
+(mayfly doctrine), reported as such with a re-scope next_step — never as
+"ran out of time". Budgets: `max_iterations` maps to max_turns (×8 turns
+per planned iteration), `max_usd` enforces when a price signal exists
+(`PHEOBE_USD_PER_MTOK`); without one the USD cap is advisory and the turn/
+ttl guards still bound the run.
+
 ## The loop
 
 ```

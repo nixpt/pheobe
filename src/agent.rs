@@ -4,12 +4,14 @@
 //! commit) run *after* the loop and have the final word over the model's
 //! claims — the machine checks everything mechanical.
 
+use crate::aging::{self, Ladder, State};
 use crate::llm::{Msg, Provider, ToolCall, Usage};
 use crate::tools::{self, ToolCtx};
 use crate::task::Task;
 use anyhow::Result;
 use serde_json::Value;
 use std::path::Path;
+use std::time::Instant;
 
 pub struct RunOutcome {
     pub ok: bool,
@@ -23,11 +25,17 @@ pub struct RunOutcome {
 
 pub struct LoopCfg {
     pub max_turns: u32,
+    /// Hard lifespan (mayfly ladder); a run past it is a task-design failure.
+    pub ttl: Option<std::time::Duration>,
+    /// USD budget; needs a price signal to be enforceable.
+    pub max_usd: Option<f64>,
+    /// Cost estimate input: dollars per million tokens (from PHEOBE_USD_PER_MTOK).
+    pub usd_per_mtok: Option<f64>,
 }
 
 impl Default for LoopCfg {
     fn default() -> Self {
-        LoopCfg { max_turns: 60 }
+        LoopCfg { max_turns: 60, ttl: None, max_usd: None, usd_per_mtok: None }
     }
 }
 
@@ -79,11 +87,47 @@ pub fn run(
     );
 
     let mut history = vec![Msg::system(system), Msg::user(format!("Begin. task_id={task_id}"))];
+    let ladder = Ladder::new(cfg.ttl);
+    let started = Instant::now();
     let mut turns = 0;
     let mut total_tokens = 0u64;
+    let mut delivered_warn = false;
+    let mut delivered_narrow = false;
+    let mut hard_stop: Option<String> = None;
     let mut handoff: Option<Value> = None;
 
     while turns < cfg.max_turns {
+        // aging ladder: hard stop past 100%; one inject per transition
+        match ladder.state_at(started.elapsed()) {
+            State::Expired => {
+                hard_stop = Some(format!(
+                    "ttl_exceeded — the deadline hit without done_when (task-design failure, \
+                     not a time problem): ttl={:?}",
+                    cfg.ttl
+                ));
+                break;
+            }
+            State::Warn if !delivered_warn => {
+                delivered_warn = true;
+                history.push(Msg::user(aging::WARN_INJECT));
+            }
+            State::Narrow if !delivered_narrow => {
+                delivered_narrow = true;
+                history.push(Msg::user(aging::NARROW_INJECT));
+            }
+            _ => {}
+        }
+        // USD budget (token-estimated when a price signal exists)
+        if let (Some(max_usd), Some(rate)) = (cfg.max_usd, cfg.usd_per_mtok) {
+            let usd = total_tokens as f64 * rate / 1_000_000.0;
+            if usd >= max_usd {
+                hard_stop = Some(format!(
+                    "budget_exceeded — ~${usd:.2} of ${max_usd:.2} spent ({total_tokens} tokens)"
+                ));
+                break;
+            }
+        }
+
         let (msg, tokens) = provider.chat(&history, &schemas)?;
         total_tokens += tokens.unwrap_or(0);
         turns += 1;
@@ -112,6 +156,13 @@ pub fn run(
 
     let handoff = match handoff {
         Some(h) => h,
+        None if hard_stop.is_some() => serde_json::json!({
+            "ok": false,
+            "summary": "",
+            "blocked": hard_stop.clone(),
+            "doubts": [],
+            "next_steps": ["re-scope the task: shorter, tighter done_when, or a bigger budget"],
+        }),
         None => serde_json::json!({
             "ok": false,
             "summary": history.iter().filter_map(|m| m.content.as_deref()).last().unwrap_or("").to_string(),

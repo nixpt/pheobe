@@ -142,7 +142,14 @@ fn cmd_run(task_file: &str, branch: Option<String>) -> Result<()> {
 
     // the model turn (PHEOBE_BASE_URL / PHEOBE_MODEL / PHEOBE_API_KEY)
     let provider = llm::OpenAi::from_env()?;
-    let outcome = agent::run(&provider, &task, &wt, &task_id, &brief, &nudges, &agent::LoopCfg::default())?;
+    let ttl = task.ttl.as_deref().map(pheobe::aging::parse_ttl).transpose()?;
+    let cfg = agent::LoopCfg {
+        max_turns: task.budget.as_ref().map(|b| b.max_iterations * 8).unwrap_or(60),
+        ttl,
+        max_usd: task.budget.as_ref().and_then(|b| b.max_usd),
+        usd_per_mtok: std::env::var("PHEOBE_USD_PER_MTOK").ok().and_then(|v| v.parse().ok()),
+    };
+    let outcome = agent::run(&provider, &task, &wt, &task_id, &brief, &nudges, &cfg)?;
 
     // mechanical gates run after the loop and have the final word over the model
     let mut commits = vec![];
