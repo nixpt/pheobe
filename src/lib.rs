@@ -13,6 +13,7 @@ pub mod learn;
 pub mod llm;
 pub mod plan;
 pub mod report;
+pub mod sandbox;
 pub mod structint;
 pub mod task;
 pub mod testparse;

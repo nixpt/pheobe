@@ -76,6 +76,18 @@ fn destructive_guard(cmd: &str) -> Option<&'static str> {
 }
 
 pub fn run_bash(cmd: &str, cwd: &Path, timeout_note: &str) -> Result<String> {
+    run_bash_tiered(cmd, cwd, &crate::sandbox::Tier::Moderate, timeout_note)
+}
+
+/// The bash tool's execution path (PHEOBE-14): destructive guard in EVERY
+/// tier, then the sandbox ladder (strict = bwrap w/o network + allowlist,
+/// moderate = bwrap w/ network, free = plain subprocess).
+pub fn run_bash_tiered(
+    cmd: &str,
+    cwd: &Path,
+    tier: &crate::sandbox::Tier,
+    timeout_note: &str,
+) -> Result<String> {
     let _ = timeout_note;
     match std::env::var("PHEOBE_SAFE_EXEC_MODE").ok().as_deref() {
         Some("off") => {}
@@ -90,14 +102,39 @@ pub fn run_bash(cmd: &str, cwd: &Path, timeout_note: &str) -> Result<String> {
             }
         }
     }
-    let out = Command::new("sh").args(["-c", cmd]).current_dir(cwd).output()?;
-    let combined = format!(
-        "{}{}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    );
-    let code = out.status.code().unwrap_or(-1);
-    Ok(format!("[exit {code}]\n{}", truncate(combined.trim_end(), 8000)))
+    // strict tier: only test/build/done_when-style commands pass the allowlist
+    if matches!(tier, crate::sandbox::Tier::Strict) && !crate::sandbox::strict_allowed(cmd) {
+        bail!(
+            "sandbox strict tier: command not on the allowlist ({cmd:?}) — only \
+             test/build/done_when prefixes (cargo test, cargo build, npm test, pytest, \
+             python3, go test, node, sh -c) are permitted; set PHEOBE_SANDBOX=moderate \
+             for general shell"
+        );
+    }
+    // bwrap isolation for strict/moderate; free (or missing bwrap on moderate)
+    // runs a plain guarded subprocess
+    match crate::sandbox::sandboxed_command(cmd, cwd, tier)? {
+        Some(mut child) => {
+            let out = child.output()?;
+            let combined = format!(
+                "{}{}",
+                String::from_utf8_lossy(&out.stdout),
+                String::from_utf8_lossy(&out.stderr)
+            );
+            let code = out.status.code().unwrap_or(-1);
+            Ok(format!("[sandbox exit {code}]\n{}", truncate(combined.trim_end(), 8000)))
+        }
+        None => {
+            let out = Command::new("sh").args(["-c", cmd]).current_dir(cwd).output()?;
+            let combined = format!(
+                "{}{}",
+                String::from_utf8_lossy(&out.stdout),
+                String::from_utf8_lossy(&out.stderr)
+            );
+            let code = out.status.code().unwrap_or(-1);
+            Ok(format!("[exit {code}]\n{}", truncate(combined.trim_end(), 8000)))
+        }
+    }
 }
 
 // ── tools ────────────────────────────────────────────────────────────────────
@@ -269,12 +306,13 @@ fn bash_tool(_ctx: &ToolCtx<'_>) -> Tool {
     Tool {
         schema: ToolSchema::new(
             "bash",
-            "Run a shell command in the worktree. Output truncated to 8KB. Destructive commands are blocked (safe-exec).",
+            "Run a shell command in the worktree. Output truncated to 8KB. Destructive commands are blocked (safe-exec). Commands run sandboxed per the run's tier (strict = no network + allowlist).",
             json!({"type":"object","properties":{"command":{"type":"string"}},"required":["command"]}),
         ),
         handler: Box::new(move |c, a| {
             let cmd = a["command"].as_str().context("command required")?;
-            run_bash(cmd, c.wt, "bash")
+            let tier = crate::sandbox::Tier::from_name(&c.task.effective_sandbox()?)?;
+            run_bash_tiered(cmd, c.wt, &tier, "bash")
         }),
     }
 }

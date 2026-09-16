@@ -28,6 +28,12 @@ pub struct Task {
     pub paths_allow: Vec<String>,
     #[serde(default)]
     pub push: bool,
+    /// Sandbox isolation for bash commands. Values: `strict`, `moderate`,
+    /// `free`. Default when unset and no env override = `moderate`.
+    /// `PHEOBE_SANDBOX` env var always wins when set (even over an
+    /// explicit task value — env is the operator override).
+    #[serde(default)]
+    pub sandbox: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -82,6 +88,22 @@ pub fn load(path: &str) -> Result<Task> {
 }
 
 impl Task {
+    /// Resolve the effective sandbox tier: `PHEOBE_SANDBOX` env (always wins)
+    /// → `task.sandbox` → `"moderate"` (default). Unknown tier = intake error.
+    pub fn effective_sandbox(&self) -> Result<String> {
+        let raw = std::env::var("PHEOBE_SANDBOX")
+            .ok()
+            .or_else(|| self.sandbox.clone())
+            .unwrap_or_else(|| "moderate".into());
+        let tier = raw.trim().to_ascii_lowercase();
+        match tier.as_str() {
+            "strict" | "moderate" | "free" => Ok(tier),
+            other => bail!(
+                "unknown sandbox tier '{other}' — PHEOBE_SANDBOX must be strict | moderate | free"
+            ),
+        }
+    }
+
     pub fn validate(&self) -> Result<()> {
         if self.task.trim().is_empty() {
             bail!("task is empty");
