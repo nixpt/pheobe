@@ -18,6 +18,7 @@ pub mod testparse;
 pub mod tools;
 pub mod verify;
 pub mod worker;
+pub mod worker_codex;
 pub mod worktree;
 
 #[cfg(test)]
