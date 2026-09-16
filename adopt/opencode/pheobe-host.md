@@ -7,7 +7,7 @@ an endpoint. `pheobe verify` is the mechanical exit gate.
 ## Install
 
 `pheobe adopt opencode` prints this file; copy it to
-`.opencode/agent/pheobe.md` in the adopting repo.
+`.opencode/agent/pheobe-host.md` in the adopting repo.
 
 ## Agent definition
 

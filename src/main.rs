@@ -45,7 +45,7 @@ enum Cmd {
     /// Print/validate an adoption kit
     Adopt {
         #[command(subcommand)]
-        cmd: AdoptCmd,
+        cmd: Option<AdoptCmd>,
     },
     /// Named working-state snapshots (git-stash plumbing; create never touches the tree)
     Check {
@@ -72,10 +72,18 @@ enum CtxCmd {
 enum AdoptCmd {
     /// Print the claude-code subagent kit (self mode)
     Claude,
-    /// Print the opencode agent kit (host mode)
+    /// Print the claude Agent SDK subagent snippet (self mode)
+    ClaudeSdk,
+    /// Print the opencode self-mode agent kit (dispatcher)
+    OpencodeSelf,
+    /// Print the opencode host-mode agent kit
     Opencode,
-    /// Print the codex bash-tool invocation (self mode)
+    /// Print the codex bash-tool invocation + Python SDK snippet (self mode)
     Codex,
+    /// Print the cursor local.agents def + hooks kit (host mode)
+    Cursor,
+    /// Print the kimi code def + provider config kit (self mode)
+    Kimi,
 }
 
 #[derive(Subcommand, Debug)]
@@ -271,11 +279,22 @@ fn cmd_ctx(cmd: CtxCmd) -> Result<()> {
     Ok(())
 }
 
-fn cmd_adopt(cmd: AdoptCmd) -> Result<()> {
+fn cmd_adopt(cmd: Option<AdoptCmd>) -> Result<()> {
     match cmd {
-        AdoptCmd::Claude => print!("{}", include_str!("../adopt/claude/self-agent.md")),
-        AdoptCmd::Opencode => print!("{}", include_str!("../adopt/opencode/host-agent.md")),
-        AdoptCmd::Codex => print!("{}", include_str!("../adopt/codex/README.md")),
+        None => print!("{}", include_str!("../adopt/README.md")),
+        Some(AdoptCmd::Claude) => print!("{}", include_str!("../adopt/claude/self-agent.md")),
+        Some(AdoptCmd::ClaudeSdk) => print!("{}", include_str!("../adopt/claude/sdk-snippet.md")),
+        Some(AdoptCmd::OpencodeSelf) => {
+            print!("{}", include_str!("../adopt/opencode/self-agent.md"));
+            print!("{}", include_str!("../adopt/opencode/opencode.jsonc-snippet.md"));
+        }
+        Some(AdoptCmd::Opencode) => print!("{}", include_str!("../adopt/opencode/pheobe-host.md")),
+        Some(AdoptCmd::Codex) => {
+            print!("{}", include_str!("../adopt/codex/README.md"));
+            print!("{}", include_str!("../adopt/codex/sdk-snippet.md"));
+        }
+        Some(AdoptCmd::Cursor) => print!("{}", include_str!("../adopt/cursor/def.md")),
+        Some(AdoptCmd::Kimi) => print!("{}", include_str!("../adopt/kimi/def.md")),
     }
     Ok(())
 }
