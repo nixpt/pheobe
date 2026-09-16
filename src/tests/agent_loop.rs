@@ -78,7 +78,9 @@ fn loop_writes_inside_allowlist_commits_and_hands_off() {
     let ev = crate::verify::run_done_when(&task, &wt).unwrap();
     assert!(ev.passed);
 
-    let sha = crate::worktree::commit(&wt, "t1", "add src/x.rs", &["src/".to_string()]).unwrap();
+    let sha = crate::worktree::commit(&wt, "t1", "add src/x.rs", &["src/".to_string()])
+        .unwrap()
+        .expect("something to commit");
     assert!(!sha.is_empty());
     let msg = run_git(&wt, &["log", "-1", "--format=%B"]);
     assert!(

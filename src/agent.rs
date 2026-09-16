@@ -158,10 +158,36 @@ pub fn run(
 
 /// The system prompt both dispatch paths share: the persona, the report
 /// contract, the task block, the brief, learned nudges, the rules.
+/// Who runs the turns. The self loop has `plan_tracker`/`verify`/`handoff`
+/// as real tool-calls; an external engine (worker route) has its own tools
+/// and none of those names — issue 07: telling it to "call handoff" stalls
+/// it or ends the run in prose. Same body, different last section.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum PromptMode {
+    /// pheobe's own loop: stages are tool-calls, `handoff` ends the run.
+    SelfLoop,
+    /// an external harness runs the turns: stages are files + commands, the
+    /// report is the final message.
+    Worker,
+}
+
 pub fn build_prompt(task: &Task, task_id: &str, brief: &str, nudges: &[String]) -> String {
+    build_prompt_for(PromptMode::SelfLoop, task, task_id, brief, nudges)
+}
+
+pub fn build_prompt_for(
+    mode: PromptMode,
+    task: &Task,
+    task_id: &str,
+    brief: &str,
+    nudges: &[String],
+) -> String {
     let mut system = String::new();
     system.push_str(include_str!("../persona/pheobe.md"));
-    system.push_str("\n\n---\n\n## Report contract (the handoff tool takes exactly this)\n");
+    system.push_str(match mode {
+        PromptMode::SelfLoop => "\n\n---\n\n## Report contract (the handoff tool takes exactly this)\n",
+        PromptMode::Worker => "\n\n---\n\n## Report contract (your FINAL message is exactly this JSON, nothing after it)\n",
+    });
     system.push_str(r#"{"ok":bool,"summary":"what changed","next_steps":[actions for the parent],"doubts":[unverified assumptions],"blocked":"reason if blocked"}"#);
     system.push_str("\n\n## Task\n");
     system.push_str(&format!(
@@ -183,16 +209,33 @@ pub fn build_prompt(task: &Task, task_id: &str, brief: &str, nudges: &[String]) 
             system.push_str(&format!("- {n}\n"));
         }
     }
-    system.push_str(
-        "\n\n## Rules\n\
-         - Work only inside the worktree and paths_allow. \"While I'm here\" is a bug.\n\
-         - Plan first with plan_tracker; update it as you go. Record every\n  \
-         unverified assumption as a doubt — never argue one away.\n\
-         - Prefer the edit that removes a special case. Minimal diff.\n\
-         - Verify with the verify tool; trust failing output over confidence.\n\
-         - Two failed repairs on one failure = the plan is wrong; go back to planning.\n\
-         - END ONLY by calling handoff. When done_when passes, hand off.\n",
-    );
+    system.push_str(match mode {
+        PromptMode::SelfLoop => {
+            "\n\n## Rules\n\
+             - Work only inside the worktree and paths_allow. \"While I'm here\" is a bug.\n\
+             - Plan first with plan_tracker; update it as you go. Record every\n  \
+             unverified assumption as a doubt — never argue one away.\n\
+             - Prefer the edit that removes a special case. Minimal diff.\n\
+             - Verify with the verify tool; trust failing output over confidence.\n\
+             - Two failed repairs on one failure = the plan is wrong; go back to planning.\n\
+             - END ONLY by calling handoff. When done_when passes, hand off.\n"
+        }
+        PromptMode::Worker => {
+            "\n\n## Rules (you are running inside your own harness — use its tools)\n\
+             - Work only inside the worktree (your cwd) and paths_allow. \"While I'm here\" is a bug.\n\
+             - Plan first: write `.pheobe/plan.json` (the smallest list of checkable steps)\n  \
+             and keep it current. Record every unverified assumption as a doubt — never\n  \
+             argue one away.\n\
+             - Prefer the edit that removes a special case. Minimal diff.\n\
+             - Verify by running the done_when command above (or `pheobe verify <task-file>`\n  \
+             when the binary is on PATH); trust failing output over confidence.\n\
+             - Two failed repairs on one failure = the plan is wrong; go back to planning.\n\
+             - Commit your work on the current branch with the trailer `Pheobe-Task: <task_id>`.\n  \
+             Do not push and do not merge — the parent merges.\n\
+             - END by printing the report contract as your final message: one JSON object,\n  \
+             bare or in a ```json fence, nothing after it. There is no handoff tool here.\n"
+        }
+    });
     system
 }
 
@@ -212,7 +255,7 @@ pub fn run_worker(
 ) -> Result<RunOutcome> {
     let ladder = Ladder::new(cfg.ttl);
     let started = Instant::now();
-    let prompt = build_prompt(task, task_id, brief, nudges);
+    let prompt = build_prompt_for(PromptMode::Worker, task, task_id, brief, nudges);
 
     let ttl_block = |why: &str| {
         serde_json::json!({

@@ -16,11 +16,15 @@ pub struct Kitchen {
 fn run(cmd: &mut Command) -> Result<String> {
     let out = cmd.output().context("spawn failed")?;
     if !out.status.success() {
-        bail!(
-            "command failed ({}): {}",
-            out.status,
-            String::from_utf8_lossy(&out.stderr).trim()
-        )
+        // git puts "nothing to commit" on STDOUT — an empty reason here is
+        // what issue 09 looked like from the outside
+        let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
+        let why = if err.is_empty() {
+            String::from_utf8_lossy(&out.stdout).trim().to_string()
+        } else {
+            err
+        };
+        bail!("command failed ({}): {why}", out.status)
     }
     Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
@@ -233,8 +237,25 @@ fn stage(wt: &Path, paths_allow: &[String]) -> Result<()> {
 }
 
 /// Commit with a provenance trailer (borrowed from commit-msg-agent-trailer).
-pub fn commit(wt: &Path, task_id: &str, message: &str, paths_allow: &[String]) -> Result<String> {
+/// Returns `None` when staging left nothing to commit — issue 09: a tree
+/// that is "dirty" only from byproducts (`__pycache__/`) or from files the
+/// engine already committed itself must not turn into a failed run.
+pub fn commit(
+    wt: &Path,
+    task_id: &str,
+    message: &str,
+    paths_allow: &[String],
+) -> Result<Option<String>> {
     stage(wt, paths_allow)?;
+    let staged = Command::new("git")
+        .arg("-C")
+        .arg(wt)
+        .args(["diff", "--cached", "--quiet"])
+        .status()
+        .context("spawn failed")?;
+    if staged.success() {
+        return Ok(None);
+    }
     let trailer = format!("Pheobe-Task: {task_id}");
     let hash = run(Command::new("git").arg("-C").arg(wt).args([
         "-c",
@@ -254,7 +275,35 @@ pub fn commit(wt: &Path, task_id: &str, message: &str, paths_allow: &[String]) -
         .arg("-C")
         .arg(wt)
         .args(["rev-parse", "--short", "HEAD"]))?;
-    Ok(sha)
+    Ok(Some(sha))
+}
+
+/// Full sha of HEAD — recorded right after provision so the report can
+/// list everything that landed since, whoever ran `git commit`.
+pub fn head_sha(wt: &Path) -> Result<String> {
+    run(Command::new("git")
+        .arg("-C")
+        .arg(wt)
+        .args(["rev-parse", "HEAD"]))
+}
+
+/// Short shas of every commit on the branch since `base`, oldest first.
+/// Issue 05: the engine (claude/opencode/codex…) commits itself when it
+/// follows the persona's COMMIT stage, so the report cannot be built from
+/// pheobe's own commit gate alone.
+pub fn commits_since(wt: &Path, base: &str) -> Result<Vec<String>> {
+    let out = run(Command::new("git").arg("-C").arg(wt).args([
+        "log",
+        "--reverse",
+        "--format=%h",
+        &format!("{base}..HEAD"),
+    ]))?;
+    Ok(out
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .map(String::from)
+        .collect())
 }
 
 /// Ship: push the branch (never a protected one). Merge is the parent's job.

@@ -52,7 +52,9 @@ fn issue02_state_dir_exempt_and_byproducts_staged_out() {
     assert_eq!(byproducts, vec!["__pycache__/".to_string()]);
 
     // commit stages ONLY the allowlisted file — the byproduct stays out
-    let sha = crate::worktree::commit(&root, "t", "fix add", &["calc.py".to_string()]).unwrap();
+    let sha = crate::worktree::commit(&root, "t", "fix add", &["calc.py".to_string()])
+        .unwrap()
+        .expect("something to commit");
     assert!(!sha.is_empty());
     let committed = crate::tests::run_git(&root, &["show", "--name-only", "--format=", "HEAD"]);
     assert!(committed.contains("calc.py"), "got: {committed}");

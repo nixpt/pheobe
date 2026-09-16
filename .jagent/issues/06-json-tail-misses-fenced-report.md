@@ -9,6 +9,8 @@ had filled in correctly — were lost.
 **Severity:** P2 — the worker route's only channel for `next_steps` and
 `doubts` silently degrades to prose; every fenced-output model hits it.
 
+**Status:** Done (PHEOBE-22)
+
 ## Expected behavior
 
 The report's `summary`, `next_steps`, `doubts` (and `ok`/`blocked`) come from

@@ -1052,12 +1052,15 @@ from ttl/budget at intake.
 
 | kit | mechanism | mode |
 |---|---|---|
-| `adopt/claude/agents/pheobe.md` | Claude Code subagent def; spawns `pheobe run --json`, parses the report | self |
-| `adopt/claude/host/agents/pheobe.md` | subagent def embedding the pheobe loop protocol; runs on claude's own model | host |
-| `adopt/opencode/agent/pheobe.md` | opencode markdown agent (tool-restricted) | self |
-| `adopt/opencode/host/agent/pheobe.md` | opencode agent embedding the loop protocol (opencode agents are exactly this shape — prompt + tool gating, parent's model) | host |
-| `adopt/codex/README.md` | no native subagents — bash-tool invocation | self |
-| `adopt/bro/` | ACP: `pheobe acp --stdio` ↔ `bro synapse dispatch --` | self |
+| `adopt/claude/self-agent.md` | Claude Code subagent def; spawns `pheobe run --json`, parses the report | self |
+| `adopt/claude/sdk-snippet.md` | the same def as an Agent SDK `AgentDefinition` | self |
+| `adopt/opencode/self-agent.md` + `opencode.jsonc-snippet.md` | opencode markdown agent (tool-restricted) + registration | self |
+| `adopt/opencode/pheobe-host.md` | opencode agent embedding the loop protocol (opencode agents are exactly this shape — prompt + tool gating, parent's model) | host |
+| `adopt/codex/README.md` + `sdk-snippet.md` | no native subagents — bash-tool invocation | self |
+| `adopt/cursor/def.md` | cursor `local.agents` def + hooks | host |
+| `adopt/kimi/def.md` | kimi code def + provider env | self |
+| (none) | claude host mode: no kit yet — the opencode host protocol was used as-is in the s457 test; a claude subagent def carrying the same protocol would make it native | host |
+| bro | ACP: `pheobe acp --stdio` ↔ `bro synapse dispatch --` — no kit file, the binary is the kit | self |
 | `adopt/README.md` | the contract every kit wraps | — |
 
 Each kit is a thin wrapper over the JSON contract; none of them change it.

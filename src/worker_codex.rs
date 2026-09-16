@@ -166,20 +166,7 @@ fn parse_jsonl(stdout: &str) -> Result<WorkerOutcome> {
             truncate(stdout)
         )
     })?;
-    let trimmed = final_text.trim();
-    let json_tail = if trimmed.starts_with('{') {
-        let mut tail = serde_json::from_str::<Value>(trimmed).ok();
-        // an empty "blocked" is the model stating "nothing blocks me" — a
-        // non-block, not a block (agent::normalize honors presence)
-        if let Some(t) = &mut tail {
-            if t.get("blocked").and_then(|b| b.as_str()) == Some("") {
-                t.as_object_mut().unwrap().remove("blocked");
-            }
-        }
-        tail.filter(|v| v.get("ok").is_some() || v.get("summary").is_some())
-    } else {
-        None
-    };
+    let json_tail = crate::worker::extract_json_tail(&final_text);
     Ok(WorkerOutcome {
         final_text,
         tokens,
