@@ -30,7 +30,7 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
       only from byproducts killed the run with an empty error (Done, PHEOBE-22).
 - [ ] **issue 10** (`../issues/10-shim-exec-etxtbsy-race-in-parallel-tests.md`) — adapter tests can
       hit ETXTBSY when a parallel test forks mid-shim-write; poisoned PATH_LOCK once (now tolerated). P3. **→ cursor** (captain, 2026-09-16)
-- [ ] **issue 11** (`../issues/11-search-walk-skips-target-files.md`) — `search::walk` skips any *file* named
+- [ ] **issue 11** (`../issues/11-search-walk-skips-any-file-named-target.md`) — `search::walk` skips any *file* named
       `target*`, not just build dirs (found + pinned in PHEOBE-35). **→ agy** (captain, 2026-09-16)
 - [x] kit drift found s457 (Done, PHEOBE-22): `adopt/claude/self-agent.md` runs `pheobe run <file> --json` (no such
       flag); DESIGN.md's kit table lists `adopt/claude/host/agents/pheobe.md` which does not exist
