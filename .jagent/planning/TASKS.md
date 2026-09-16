@@ -29,7 +29,9 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 - [x] **issue 09** (`../issues/09-byproduct-only-dirty-tree-fails-the-commit-gate.md`) — a tree dirty
       only from byproducts killed the run with an empty error (Done, PHEOBE-22).
 - [ ] **issue 10** (`../issues/10-shim-exec-etxtbsy-race-in-parallel-tests.md`) — adapter tests can
-      hit ETXTBSY when a parallel test forks mid-shim-write (codex, sandboxed run). P4 flake.
+      hit ETXTBSY when a parallel test forks mid-shim-write; poisoned PATH_LOCK once (now tolerated). P3. **→ cursor** (captain, 2026-09-16)
+- [ ] **issue 11** (`../issues/11-search-walk-skips-target-files.md`) — `search::walk` skips any *file* named
+      `target*`, not just build dirs (found + pinned in PHEOBE-35). **→ agy** (captain, 2026-09-16)
 - [x] kit drift found s457 (Done, PHEOBE-22): `adopt/claude/self-agent.md` runs `pheobe run <file> --json` (no such
       flag); DESIGN.md's kit table lists `adopt/claude/host/agents/pheobe.md` which does not exist
       (claude has no host kit — the opencode host protocol was used instead); `testparse` labels a
