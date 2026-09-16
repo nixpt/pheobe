@@ -19,7 +19,8 @@ pub mod tools;
 pub mod verify;
 pub mod worker;
 pub mod worker_opencode;
-pub mod worker_claude;pub mod worktree;
-
+pub mod worker_claude;
+pub mod worker_codex;
+pub mod worktree;
 #[cfg(test)]
 mod tests;
