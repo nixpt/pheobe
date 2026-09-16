@@ -61,6 +61,8 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 
 - [x] PHEOBE-21 — LOC budget: split tests.rs / tools.rs, adopt the 500/1000 rule
 - [x] PHEOBE-22 — worker-route report fidelity: issues 05–09 + kit drift (s457 adoption test)
+- [x] PHEOBE-23 — Cursor SDK/CLI alignment: --sandbox mapping, usage/cost parse, file-form kit (cursor)
+- [x] PHEOBE-24 — agent-sync channel: `scripts/pheobe-sync` + `docs/SYNC.md` + RULES §7
 - [x] **PHEOBE-23** — Cursor SDK/CLI alignment (`--sandbox` map, IDE agents kit, `disallowedTools` on AgentOptions)
 
 ## W5 — release
