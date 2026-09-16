@@ -1077,7 +1077,8 @@ pheobe host    setup|finish <task.json>  # host supervisor: provision kitchen, t
 pheobe ctx     list|brief|get|search|new|verify   # knowledge drive (borrowed from jokersquad ctx)
 pheobe acp     [--stdio]                 # ACP stdio server (bro/ACP adopters)
 pheobe adopt   <claude|opencode|codex|bro> [--host]  # print/install that harness's kit
-pheobe doctor                              # endpoint + worktree primitive check
+pheobe doctor                              # version vs public channel + endpoint + primitives
+pheobe update  [--check] [--force]         # cargo install pheobe from crates.io (git fallback)
 ```
 
 ## Non-goals
