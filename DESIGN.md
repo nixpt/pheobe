@@ -626,6 +626,94 @@ override is a swap, not a fork.
 | `agent-handoff` stand-down gate | reassignment requires prior owner's ack | parent-side doctrine; pheobe respects it by never merging — it ships the branch, the parent merges |
 | two-layer identity (role + instance) | `identities/<name>.md` role vs accumulated instance memory | pheobe ships the role only (`persona/pheobe.md`); per-repo instance knowledge is already the repo's `.dejavue/` — a scoped worker keeps no second memory layer |
 
+## OpenCode integration (three surfaces)
+
+Verified on this box: opencode 1.18.31; `opencode serve` (headless, REST
+session API); `opencode run --format json --agent <x> -m provider/model
+--attach <server>`; repo-local `.opencode/agent/*.md` agents; a
+permission model (deny-pattern bash rules, edit globs,
+`external_directory` allowlist). Zen (the hosted completions endpoint) is
+already the live-proven self-mode provider — the s456 field run used it
+(`https://opencode.ai/zen/v1` + `deepseek-v4-pro`/`kimi-k2.6`/`glm-5.2`,
+identical behavior on all three).
+
+### Surface 1 — pheobe as client on Zen (live)
+
+```bash
+PHEOBE_BASE_URL=https://opencode.ai/zen/v1 \
+PHEOBE_MODEL=opencode/deepseek-v4-pro \
+PHEOBE_API_KEY=… pheobe run task.json
+```
+
+Nothing new to build — this is the default `OpenAi` provider against
+opencode's hosted completions endpoint. The reference run: model turn +
+tool loop correct on all three Zen models, every run then blocked by the
+allowlist gate (issues 01–03, now fixed and re-verified).
+
+### Surface 2 — worker adapter (`PHEOBE_PROVIDER=opencode`)
+
+The mayfly inversion, fully inside pheobe: pheobe keeps the **mechanical
+half** of the loop (intake fuzziness gate, worktree ladder, aging ladder,
+`done_when`, allowlist, pathspec commit, report) and delegates the **turn
+loop** to opencode:
+
+```
+intake/worktree/aging   pheobe binary   (policy, gates — never delegated)
+turn loop               opencode       (its model + its tools = the engine)
+verify/commit/handoff   pheobe binary   (mechanical — never delegated)
+```
+
+- CLI shape: `opencode run --agent pheobe -m <model> --format json
+  --attach http://127.0.0.1:<port>` — the prompt is pheobe's protocol
+  envelope (persona + loop stages + task + done_when + report contract),
+  i.e. the host-mode kit's text, authored by pheobe, not hand-written by
+  the parent.
+- `--attach` is the server integration: one headless `opencode serve`
+  instance hosts N pheobe runs as sessions (session-scoped, REST
+  `/api/session` + `/prompt` + event stream) instead of N cold CLI boots.
+- Report normalization: opencode's own agent loop emits what it emits;
+  pheobe runs `pheobe verify` + the mechanical gates and builds the
+  handoff report itself — the engine's output is prose, the contract is
+  pheobe's. If the engine was told the report shape (host-agent.md), its
+  last message's JSON is merged into the report's `summary`/`next_steps`/
+  `doubts`; mechanical fields are always pheobe's.
+
+Env: `PHEOBE_PROVIDER=opencode` (default `openai`),
+`PHEOBE_OPENCODE_BIN` (default `opencode`),
+`PHEOBE_OPENCODE_MODEL` (mayfly's `MAYFLY_OPENCODE_MODEL` precedent),
+`PHEOBE_OPENCODE_URL` (attach to a running `opencode serve`).
+
+### Surface 3 — subagent defs (host mode kits)
+
+Two repo-local flavors, both `.opencode/agent/*.md`:
+
+| file | mode | content |
+|---|---|---|
+| `pheobe.md` | self | bash-only toolset; the agent's job is to write the task JSON and run `pheobe run --json`, then act on the report — opencode is the dispatcher, pheobe's binary is the engine |
+| `pheobe-host.md` | host | opencode's own model runs the pheobe protocol with opencode's own tools (the existing host-agent.md) |
+
+`pheobe adopt opencode` prints both plus the `opencode.jsonc` snippet
+(agent registration + the sandbox mapping below).
+
+### Sandbox tier ↔ opencode permissions
+
+| pheobe tier | opencode surface |
+|---|---|
+| strict | opencode cannot provide namespace isolation → in self mode only, or opencode itself run inside a `buckets run` bwrap (rare; document, don't default) |
+| moderate | opencode's own permission prompts + `external_directory` allowlist scoped to the worktree + `/tmp` |
+| free | opencode's default config policy — its deny-pattern bash rules are the same lineage as pheobe's safe-exec list (both descend from the 2026-05-15 rules), so `free` under opencode ≈ its shipped guardrails |
+
+Degradation rule (unchanged from the sandbox ladder section): host can't
+provide the requested tier → `{ok:false, blocked:"sandbox_unavailable"}`.
+
+### Ticket
+
+**PHEOBE-4** (planning board): implement Surface 2's worker adapter —
+`PHEOBE_PROVIDER=opencode` behind the `Provider` trait's sibling
+`Worker` trait (one prompt in, whole-turn-loop out), Zen-vs-local
+`--attach` both supported, report normalization, `pheobe adopt opencode`
+extended to emit all three files + the jsonc snippet.
+
 ## Persona & skills
 
 The persona is not invented — it is mined from the people who built the
