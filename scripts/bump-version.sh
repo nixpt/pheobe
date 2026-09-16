@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/bump-version.sh — bump the pheobe version on merge to agent/nixp/PHEOBE-18-release.
+# scripts/bump-version.sh — bump the pheobe version on merge to main.
 # Installed by squadron/bin/bump-version --install (from squadron; edit there
 # and re-run --install to update, not here — this copy will be overwritten).
 #
