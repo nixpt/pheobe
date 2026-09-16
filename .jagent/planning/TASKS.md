@@ -18,6 +18,18 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 - [ ] **issue 04** (`../issues/04-failed-model-run-leaves-empty-worktree.md`) — a run that
       dies before the model turn (endpoint/auth failure) leaves an empty worktree + branch
       behind. P3 hygiene.
+- [ ] **issue 05** (`../issues/05-worker-route-drops-commits-the-engine-made.md`) — worker route
+      reports no `commits` when the engine committed itself (found: claude adapter, s457). P2.
+- [ ] **issue 06** (`../issues/06-json-tail-misses-fenced-report.md`) — a ```json-fenced handoff
+      report is not parsed; `next_steps`/`doubts` collapse into prose `summary`. P2.
+- [ ] **issue 07** (`../issues/07-worker-prompt-advertises-self-mode-tools.md`) — worker prompt
+      tells external engines to call `plan_tracker`/`verify`/`handoff` tools they don't have. P2.
+- [ ] **issue 08** (`../issues/08-verify-prints-no-reason-on-done-when-failure.md`) — `pheobe verify`
+      gives the host no reason on a done_when failure. P3.
+- [ ] kit drift found s457: `adopt/claude/self-agent.md` runs `pheobe run <file> --json` (no such
+      flag); DESIGN.md's kit table lists `adopt/claude/host/agents/pheobe.md` which does not exist
+      (claude has no host kit — the opencode host protocol was used instead); `testparse` labels a
+      Python stdlib `ok <name>` runner as `"runner": "go"` (cosmetic).
 
 ## M0 — the loop exists
 
