@@ -512,6 +512,24 @@ v0 store is JSONL, keeping the default build dependency-free; the upstream
 SQLite/FTS shape returns if the corpus is ever pointed at the shared joker
 DB via config.
 
+**Review provider.** The review pass (events → lessons → nudges) is an LLM
+call — same provider as the loop **by default** (upstream uses its shared
+`ProviderManager` with `reviewer_model: "default"`), decoupled on demand:
+`PHEOBE_REVIEW_BASE_URL` / `PHEOBE_REVIEW_MODEL` override, following bro's
+embedder precedent (chat on flownet, review on any OpenAI-shaped endpoint).
+In **host mode there is no pheobe LLM**: the parent reviews (it already saw
+the run), or the host's own memory does under `PHEOBE_MEMORY=host`.
+
+**Learning produces skill *candidates*, not skills.** Mirroring upstream
+`skill_candidates` (born `pending`, only `approve_skill` promotes, repeated
+extraction bumps `extraction_count`): the review extracts recurring
+procedures from events; a nudge that keeps coming back (same repo, same
+gotcha) graduates to a `skill_candidate`; **human approval is the gate**
+before it ever enters the barn as a runnable skill. This satisfies the
+workspace's skill-creation doctrine (recurrence gate, not one-off vibes)
+and persona-authoring (skills are contracts, not moods) without adding a
+dependency.
+
 **Host-mode override.** `PHEOBE_MEMORY=none|local|host` (default `local`):
 `host` reads/writes the adopting harness's own memory surface
 (`joker_store_fact` on a joker box, claude/codex memory when they grow one)
