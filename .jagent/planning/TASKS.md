@@ -9,7 +9,7 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 ## P0 — Build & Core Health
 
 - [x] `cargo build --release` clean
-- [x] `cargo test` green — 157 tests (`src/tests.rs` + `[[test]]` cli + per-module tests)
+- [x] `cargo test` green — 177 tests (`src/tests.rs` + `[[test]]` cli + per-module tests)
 - [x] `cargo clippy --all-targets -- -D warnings` + `cargo fmt --check` clean (PHEOBE-20)
 - [x] CI: `.github/workflows/ci.yml` (fmt, clippy, test, package) + release gate (PHEOBE-20)
 - [x] **issue 01** — allowlist off-by-one on the first porcelain line (Done, PHEOBE-3)
