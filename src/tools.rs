@@ -10,8 +10,8 @@
 mod exec;
 mod fs;
 mod meta;
-mod search;
-mod structural;
+pub(crate) mod search;
+pub(crate) mod structural;
 
 use crate::llm::ToolSchema;
 use crate::task::Task;

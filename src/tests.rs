@@ -19,6 +19,8 @@ mod opencode;
 mod outcome;
 mod p10;
 mod scripted;
+mod search;
+mod structural;
 mod update;
 mod worker_route;
 

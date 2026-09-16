@@ -279,14 +279,14 @@ fn truncate(s: &mut String) {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use std::sync::Mutex;
 
     /// Serializes tests that mutate the process-global `PATH` env, which would
     /// otherwise race against other tests in the same binary (git spawns via
     /// PATH, other adapter tests setting PHEOBE_* env, etc.).
-    static PATH_LOCK: Mutex<()> = Mutex::new(());
+    pub(crate) static PATH_LOCK: Mutex<()> = Mutex::new(());
 
     fn scratch(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!(
