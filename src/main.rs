@@ -95,7 +95,7 @@ enum AdoptCmd {
     Opencode,
     /// Print the codex bash-tool invocation + Python SDK snippet (self mode)
     Codex,
-    /// Print the cursor local.agents def + hooks kit (host mode)
+    /// Print the cursor host-mode kit (SDK + IDE agent + CLI sandbox map)
     Cursor,
     /// Print the kimi code def + provider config kit (self mode)
     Kimi,
@@ -250,7 +250,10 @@ fn cmd_adopt(cmd: Option<AdoptCmd>) -> Result<()> {
             print!("{}", include_str!("../adopt/codex/README.md"));
             print!("{}", include_str!("../adopt/codex/sdk-snippet.md"));
         }
-        Some(AdoptCmd::Cursor) => print!("{}", include_str!("../adopt/cursor/def.md")),
+        Some(AdoptCmd::Cursor) => {
+            print!("{}", include_str!("../adopt/cursor/def.md"));
+            print!("{}", include_str!("../adopt/cursor/pheobe-host.md"));
+        }
         Some(AdoptCmd::Kimi) => print!("{}", include_str!("../adopt/kimi/def.md")),
     }
     Ok(())

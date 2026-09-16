@@ -101,8 +101,9 @@ Everything is environment-driven; there is no config file.
 
 `adopt/` holds one kit per harness, each a thin wrapper over the same JSON
 contract: Claude Code subagent defs (self and host), an Agent SDK snippet,
-opencode agent defs, a codex bash-tool invocation, a cursor `local.agents`
-def, a kimi def. `pheobe adopt <name>` prints the kit; `adopt/README.md`
+opencode agent defs, a codex bash-tool invocation, a cursor host kit
+(SDK `Agent.create` + IDE `~/.cursor/agents/` + CLI `--sandbox` map), a
+kimi def. `pheobe adopt <name>` prints the kit; `adopt/README.md`
 states the contract every kit wraps.
 
 ## Design
