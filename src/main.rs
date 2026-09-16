@@ -4,7 +4,7 @@
 
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
-use pheobe::{knowledge, learn, plan, report, task, verify, worktree};
+use pheobe::{agent, knowledge, learn, llm, plan, report, task, verify, worktree};
 use std::path::{Path, PathBuf};
 
 #[derive(Parser, Debug)]
@@ -116,16 +116,13 @@ fn cmd_run(task_file: &str, branch: Option<String>) -> Result<()> {
     let task = task::load(task_file)?;
     let repo = task.resolve_repo()?;
     let branch = branch.or(task.branch.clone()).unwrap_or_else(|| format!("pheobe/{}", task_slug(&task.task)));
-    #[allow(unused_variables)]
     let task_id = task_slug(&task.task);
 
-    if task.worktree {
-        if Path::new(&repo).join(".git").is_dir() {
-            bail!(
-                "refusing to cook in the primary source checkout — pass --worktree or set \
-                 worktree:true (the source checkout is shared: mom's kitchen rule)"
-            );
-        }
+    if !task.worktree && Path::new(&repo).join(".git").is_dir() {
+        bail!(
+            "refusing to cook in the primary source checkout — set worktree:true (default) \
+             or point repo at a worktree (the source checkout is shared: mom's kitchen rule)"
+        );
     }
     let (wt, branch) = worktree::provision(&repo, &branch)?;
     eprintln!("🍳 worktree: {}  branch: {branch}", wt.display());
@@ -134,34 +131,62 @@ fn cmd_run(task_file: &str, branch: Option<String>) -> Result<()> {
 
     // orient: knowledge drive brief (repo-local + global drives) + learned nudges
     let entries = knowledge::load_all(Some(&wt))?;
-    let _brief = knowledge::brief(&entries);
+    let brief = knowledge::brief(&entries);
     let nudges = learn::nudges_for(&repo_str);
     if !nudges.is_empty() {
         eprintln!("📚 {} learned nudge(s) for this repo", nudges.len());
     }
 
-    // plan file seeded with the task; steps filled by the model turn
+    // plan file seeded; the model refines it through the loop
     plan::save(&wt, &plan::Plan { task: task.task.clone(), steps: vec![] })?;
 
-    // THE MODEL TURN IS THE ONE UNWIRED PIECE (v0.2): uno feature / OpenAI-shaped
-    // endpoint. Until wired, the mechanical stages still run — and the run
-    // reports honestly instead of pretending.
-    let blocked = "model loop not wired in v0.1 — mechanical stages live, turn loop pending";
-    let _ = learn::end_session(session.as_ref(), "blocked", 1);
-    let report = report::HandoffReport {
-        ok: false,
+    // the model turn (PHEOBE_BASE_URL / PHEOBE_MODEL / PHEOBE_API_KEY)
+    let provider = llm::OpenAi::from_env()?;
+    let outcome = agent::run(&provider, &task, &wt, &task_id, &brief, &nudges, &agent::LoopCfg::default())?;
+
+    // mechanical gates run after the loop and have the final word over the model
+    let mut commits = vec![];
+    let dirty = worktree::status_dirty(&wt)?;
+    if outcome.ok && dirty {
+        let violations = worktree::check_allowlist(&wt, &task.paths_allow)?;
+        if !violations.is_empty() {
+            let _ = learn::end_session(session.as_ref(), "allowlist_violation", 2);
+            let rep = report::HandoffReport::failure(&task.task, &format!("paths outside paths_allow: {}", violations.join(", ")));
+            report::emit(&rep)?;
+            bail!("run blocked by allowlist violations");
+        }
+        let sha = worktree::commit(&wt, &task_id, outcome.summary.as_deref().unwrap_or(&task.task))?;
+        commits.push(sha);
+    }
+
+    let tests = if outcome.ok || dirty {
+        Some(verify::run_done_when(&task, &wt)?)
+    } else {
+        None
+    };
+    let ok = outcome.ok && tests.as_ref().map(|t| t.passed).unwrap_or(true);
+    if !ok {
+        eprintln!("❌ done_when failed");
+    }
+    let _ = learn::end_session(session.as_ref(), if ok { "done" } else { "failed" }, if ok { 0 } else { 1 });
+
+    let rep = report::HandoffReport {
+        ok,
         task: task.task.clone(),
         branch: Some(branch),
         worktree: Some(wt.display().to_string()),
-        commits: vec![],
-        tests: None,
-        summary: None,
-        next_steps: vec!["wire the model endpoint (PHEOBE_BASE_URL/PHEOBE_MODEL) and rerun".into()],
-        doubts: vec![],
-        blocked: Some(blocked.into()),
-        usage: None,
+        commits,
+        tests,
+        summary: outcome.summary,
+        next_steps: outcome.next_steps,
+        doubts: outcome.doubts,
+        blocked: if ok { None } else { outcome.blocked.or(Some("done_when failed".into())) },
+        usage: Some(report::Usage { turns: outcome.usage.turns, usd: None }),
     };
-    report::emit(&report)
+    if task.push && ok {
+        worktree::push(&wt, rep.branch.clone().unwrap_or_default().as_str())?;
+    }
+    report::emit(&rep)
 }
 
 fn cmd_verify(task_file: &str, worktree: Option<String>) -> Result<()> {

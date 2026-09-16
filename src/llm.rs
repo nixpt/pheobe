@@ -1,0 +1,152 @@
+//! Model layer — OpenAI-shaped chat-completions client (v0.2 of the endpoint
+//! decision in DESIGN.md: own client now, uno as an opt-in feature later).
+//!
+//! The turn loop depends on the `Provider` trait, never on the network —
+//! tests inject a scripted mock. The OpenAI-shaped impl covers opencode's
+//! server, pipefish `/v1`, Ollama, flownet, anything chat-completions-shaped.
+
+use anyhow::{bail, Context, Result};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Msg {
+    /// system | user | assistant | tool
+    pub role: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tool_calls: Vec<ToolCall>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_call_id: Option<String>,
+}
+
+impl Msg {
+    pub fn system(content: impl Into<String>) -> Self {
+        Msg { role: "system".into(), content: Some(content.into()), tool_calls: vec![], tool_call_id: None }
+    }
+    pub fn user(content: impl Into<String>) -> Self {
+        Msg { role: "user".into(), content: Some(content.into()), tool_calls: vec![], tool_call_id: None }
+    }
+    pub fn tool_result(id: &str, content: impl Into<String>) -> Self {
+        Msg { role: "tool".into(), content: Some(content.into()), tool_calls: vec![], tool_call_id: Some(id.to_string()) }
+    }
+    pub fn assistant(content: impl Into<String>, tool_calls: Vec<ToolCall>) -> Self {
+        Msg { role: "assistant".into(), content: Some(content.into()), tool_calls, tool_call_id: None }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolCall {
+    pub id: String,
+    pub function: ToolFn,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolFn {
+    pub name: String,
+    /// JSON object as a string (the OpenAI wire shape).
+    pub arguments: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ToolSchema {
+    #[serde(rename = "type")]
+    kind: String,
+    function: ToolSchemaFn,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct ToolSchemaFn {
+    name: String,
+    description: String,
+    parameters: Value,
+}
+
+impl ToolSchema {
+    pub fn new(name: &str, description: &str, parameters: Value) -> Self {
+        ToolSchema { kind: "function".into(), function: ToolSchemaFn { name: name.into(), description: description.into(), parameters } }
+    }
+    pub fn name(&self) -> &str {
+        &self.function.name
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Usage {
+    pub turns: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_tokens: Option<u64>,
+}
+
+/// The LLM behind the loop is pluggable; the loop is the contract.
+pub trait Provider {
+    /// One generate: send the transcript, get one assistant message.
+    fn chat(&self, messages: &[Msg], tools: &[ToolSchema]) -> Result<(Msg, Option<u64>)>;
+}
+
+pub struct OpenAi {
+    base_url: String,
+    api_key: String,
+    model: String,
+}
+
+impl OpenAi {
+    pub fn from_env() -> Result<Self> {
+        let base_url = std::env::var("PHEOBE_BASE_URL")
+            .context("PHEOBE_BASE_URL not set — pheobe needs a model endpoint (e.g. pipefish /v1, opencode server, Ollama)")?;
+        let model = std::env::var("PHEOBE_MODEL")
+            .context("PHEOBE_MODEL not set — name the model pheobe should run")?;
+        let api_key = std::env::var("PHEOBE_API_KEY").unwrap_or_default();
+        Ok(OpenAi { base_url: base_url.trim_end_matches('/').to_string(), api_key, model })
+    }
+}
+
+impl Provider for OpenAi {
+    fn chat(&self, messages: &[Msg], tools: &[ToolSchema]) -> Result<(Msg, Option<u64>)> {
+        let mut body = serde_json::json!({
+            "model": self.model,
+            "messages": messages,
+            "tools": tools,
+        });
+        if tools.is_empty() {
+            body.as_object_mut().unwrap().remove("tools");
+        }
+        let url = format!("{}/chat/completions", self.base_url);
+        let client = reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(120))
+            .build()
+            .context("http client")?;
+        let mut req = client
+            .post(&url)
+            .header("content-type", "application/json")
+            .json(&body);
+        if !self.api_key.is_empty() {
+            req = req.bearer_auth(&self.api_key);
+        }
+        let resp = req.send().context("endpoint unreachable")?;
+        let status = resp.status();
+        let text = resp.text().context("reading endpoint response")?;
+        if !status.is_success() {
+            bail!("endpoint {status}: {}", truncate(&text, 400));
+        }
+        let v: Value = serde_json::from_str(&text).context("endpoint returned non-JSON")?;
+        let choice = v
+            .pointer("/choices/0/message")
+            .context("endpoint response had no choices[0].message")?
+            .clone();
+        let msg: Msg = serde_json::from_value(choice)?;
+        let total = v
+            .pointer("/usage/total_tokens")
+            .and_then(|t| t.as_u64());
+        Ok((msg, total))
+    }
+}
+
+pub fn truncate(s: &str, max: usize) -> String {
+    if s.len() <= max {
+        s.to_string()
+    } else {
+        format!("{}…[{} bytes truncated]", &s[..max], s.len() - max)
+    }
+}

@@ -4,11 +4,14 @@
 //! schema, and the handoff report are the contract; the LLM behind the loop
 //! is not. See DESIGN.md.
 
+pub mod agent;
 pub mod knowledge;
 pub mod learn;
+pub mod llm;
 pub mod plan;
 pub mod report;
 pub mod task;
+pub mod tools;
 pub mod verify;
 pub mod worktree;
 

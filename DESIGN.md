@@ -188,7 +188,10 @@ works anywhere). Kits declare their mode; a harness can install both.
 ## Model endpoint
 
 Decision (2026-09-16): **own OpenAI-compatible client now, uno behind an
-opt-in cargo feature later.**
+opt-in cargo feature later.** *(Status: the model turn is WIRED as of
+PHEOBE-1 — `llm::Provider` trait with a blocking OpenAI-shaped impl
+(`PHEOBE_BASE_URL`/`PHEOBE_MODEL`/`PHEOBE_API_KEY`), the turn loop is
+mock-provider-tested end-to-end.)*
 
 - v0: minimal reqwest client over the OpenAI chat-completions wire format
   (`/v1/chat/completions`, streaming, tool_calls). Works with the endpoints

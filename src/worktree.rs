@@ -81,6 +81,11 @@ fn provision_buckets(repo: &Path, branch: &str) -> Result<(PathBuf, String)> {
     Ok((PathBuf::from(last), branch.to_string()))
 }
 
+pub fn status_dirty(wt: &Path) -> Result<bool> {
+    let status = run(Command::new("git").arg("-C").arg(wt).args(["status", "--porcelain"]))?;
+    Ok(!status.trim().is_empty())
+}
+
 /// Pre-commit scope check: staged/unstaged paths must sit inside paths_allow.
 pub fn check_allowlist(wt: &Path, paths_allow: &[String]) -> Result<Vec<String>> {
     let status = run(Command::new("git").arg("-C").arg(wt)
