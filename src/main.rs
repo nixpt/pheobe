@@ -4,7 +4,7 @@
 
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
-use pheobe::{agent, knowledge, learn, llm, plan, report, task, verify, worktree};
+use pheobe::{agent, checkpoint, knowledge, learn, llm, plan, report, task, verify, worktree};
 use std::path::{Path, PathBuf};
 
 #[derive(Parser, Debug)]
@@ -47,6 +47,11 @@ enum Cmd {
         #[command(subcommand)]
         cmd: AdoptCmd,
     },
+    /// Named working-state snapshots (git-stash plumbing; create never touches the tree)
+    Check {
+        #[command(subcommand)]
+        cmd: CheckCmd,
+    },
     /// Check the environment: endpoint, worktree primitives, optional tools
     Doctor,
 }
@@ -71,6 +76,21 @@ enum AdoptCmd {
     Opencode,
     /// Print the codex bash-tool invocation (self mode)
     Codex,
+}
+
+#[derive(Subcommand, Debug)]
+enum CheckCmd {
+    /// Snapshot the current dirty state under a name
+    Create { name: String },
+    /// List checkpoints
+    List,
+    /// Apply a checkpoint's snapshot back onto the working tree
+    Restore { name: String },
+    /// Keep only the newest N checkpoints
+    Prune {
+        #[arg(long, default_value_t = 5)]
+        keep: usize,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -108,6 +128,7 @@ fn run_cmd() -> Result<()> {
         Cmd::Ctx { cmd } => cmd_ctx(cmd),
         Cmd::Learn { cmd } => cmd_learn(cmd),
         Cmd::Adopt { cmd } => cmd_adopt(cmd),
+        Cmd::Check { cmd } => cmd_check(cmd),
         Cmd::Doctor => cmd_doctor(),
     }
 }
@@ -266,6 +287,36 @@ fn cmd_learn(cmd: LearnCmd) -> Result<()> {
                 }
             }
         }
+    }
+    Ok(())
+}
+
+fn cmd_check(cmd: CheckCmd) -> Result<()> {
+    let wt = std::env::current_dir()?;
+    match cmd {
+        CheckCmd::Create { name } => println!("checkpoint: {}", checkpoint::create(&wt, &name)?),
+        CheckCmd::List => {
+            let cps = checkpoint::list(&wt)?;
+            if cps.is_empty() {
+                println!("no checkpoints in {}", wt.join(".pheobe").join("checkpoints.json").display());
+                return Ok(());
+            }
+            println!("{:<20} {:<12} {:<12} {:<12}", "NAME", "TS", "HEAD", "STASH");
+            for c in cps {
+                println!(
+                    "{:<20} {:<12} {:<12} {:<12}",
+                    c.name,
+                    c.ts,
+                    c.head.chars().take(8).collect::<String>(),
+                    c.stash
+                        .as_deref()
+                        .map(|s| s.chars().take(8).collect::<String>())
+                        .unwrap_or_else(|| "none".into())
+                );
+            }
+        }
+        CheckCmd::Restore { name } => println!("checkpoint: {}", checkpoint::restore(&wt, &name)?),
+        CheckCmd::Prune { keep } => println!("checkpoint: {}", checkpoint::prune(&wt, keep)?),
     }
     Ok(())
 }

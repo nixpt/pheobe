@@ -147,7 +147,8 @@ fn write_tool(_ctx: &ToolCtx<'_>) -> Tool {
                 std::fs::create_dir_all(parent)?;
             }
             std::fs::write(&p, a["content"].as_str().context("content required")?)?;
-            Ok(format!("wrote {} ({} bytes)", p.display(), a["content"].as_str().unwrap_or("").len()))
+            let note = crate::fmt::format_on_write(c.wt, &p).unwrap_or_default();
+            Ok(format!("wrote {} ({} bytes){note}", p.display(), a["content"].as_str().unwrap_or("").len()))
         }),
     }
 }
@@ -174,7 +175,8 @@ fn edit_tool(_ctx: &ToolCtx<'_>) -> Tool {
             }
             let updated = txt.replacen(old, new, 1);
             std::fs::write(&p, &updated)?;
-            Ok(format!("edited {} (+{}-{} chars)", p.display(), new.len(), old.len()))
+            let note = crate::fmt::format_on_write(c.wt, &p).unwrap_or_default();
+            Ok(format!("edited {} (+{}-{} chars){note}", p.display(), new.len(), old.len()))
         }),
     }
 }
@@ -284,10 +286,30 @@ fn plan_tool(_ctx: &ToolCtx<'_>) -> Tool {
         ),
         handler: Box::new(move |c, a| {
             let steps: Vec<Step> = serde_json::from_value(a["steps"].clone())?;
+            if let Err(why) = plan::validate_steps(&steps) {
+                bail!("plan_tracker refused: {why}");
+            }
+            let prev = plan::load(c.wt).ok().flatten();
             let p = plan::Plan { task: c.task.task.clone(), steps };
+            checkpoint_step_boundaries(c, &p, prev.as_ref());
             plan::save(c.wt, &p)?;
             Ok("plan updated".into())
         }),
+    }
+}
+
+/// Loop checkpoints at plan-step boundaries (PHEOBE-10): each step newly
+/// marked done gets a named snapshot of the current dirty state. Best-effort
+/// and tree-safe — a failed snapshot never fails the plan update.
+fn checkpoint_step_boundaries(ctx: &ToolCtx<'_>, new: &plan::Plan, old: Option<&plan::Plan>) {
+    for (i, s) in new.steps.iter().enumerate() {
+        if s.status != "done" {
+            continue;
+        }
+        let was_done = old.and_then(|o| o.steps.get(i)).map(|ps| ps.status == "done").unwrap_or(false);
+        if !was_done {
+            let _ = crate::checkpoint::create(ctx.wt, &format!("step-{i}"));
+        }
     }
 }
 
@@ -295,7 +317,7 @@ fn verify_tool(_ctx: &ToolCtx<'_>) -> Tool {
     Tool {
         schema: ToolSchema::new(
             "verify",
-            "Run a command and return structured pass/fail (structured test evidence, not raw text).",
+            "Run a command and return structured pass/fail. Test-runner output (cargo/jest/pytest/go) is parsed into structured evidence {runner,total,passed,failed,failures}; the raw excerpt stays as fallback.",
             json!({"type":"object","properties":{"command":{"type":"string"}},"required":["command"]}),
         ),
         handler: Box::new(move |c, a| {
@@ -310,7 +332,10 @@ fn verify_tool(_ctx: &ToolCtx<'_>) -> Tool {
                 String::from_utf8_lossy(&out.stdout),
                 String::from_utf8_lossy(&out.stderr)
             );
-            Ok(json!({"passed": passed, "excerpt": truncate(combined.trim_end(), 3000)}).to_string())
+            let structured = crate::testparse::parse(&combined)
+                .map(|r| serde_json::to_value(r).unwrap_or(Value::Null))
+                .unwrap_or(Value::Null);
+            Ok(json!({"passed": passed, "excerpt": truncate(combined.trim_end(), 3000), "structured": structured}).to_string())
         }),
     }
 }
