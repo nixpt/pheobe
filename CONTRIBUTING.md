@@ -4,6 +4,24 @@ pheobe is small on purpose: one binary, no daemon, no path deps, a JSON
 contract that adopting harnesses can rely on. Contributions that keep it that
 way are welcome — bug reports with a reproducing task file most of all.
 
+This file has two audiences: humans and AI coding agents. Both are welcome —
+pheobe *is* an agent, and most of its commits so far were made by agents
+working alongside a human. The expectations are the same; where an agent
+needs something extra, it is called out below.
+
+## Before you start
+
+1. `README.md` for the shape of the thing; `DESIGN.md` for why it is shaped
+   that way.
+2. `.jagent/planning/TASKS.md` and `.jagent/planning/tickets/` — most
+   non-trivial work already has a `PHEOBE-N` ticket with a problem statement,
+   success criteria and explicit non-goals. Read it first; it may have
+   already decided what you were about to re-litigate. Field defects live in
+   `.jagent/issues/`.
+3. `dejavue context` — the recorded decisions and their reasons.
+4. If your change is not covered by a ticket or issue, open one before
+   writing code (template: `.jagent/planning/templates/ticket.md`).
+
 ## Ground rules
 
 - **Work on a branch in a worktree**, never on `main`. pheobe practises what it
@@ -67,6 +85,44 @@ everything around it. Copy the shape of `src/worker_cursor.rs`:
 (a docs URL, a repository, a crates.io/npm/PyPI page, a version you read),
 never a path on your machine. Keep an entry under ~90 lines: it is injected
 into prompts.
+
+## For AI coding agents specifically
+
+If you are an agent (Claude, Codex, Cursor, opencode, Kimi, Antigravity,
+Gemini, Copilot, or otherwise) working in this repo:
+
+- **`CLAUDE.md` and `AGENTS.md` are generated** from `.dejavue/context.md`
+  by `dejavue export --target claude|codex --replace`. The begin/end markers
+  carry a hash; if either file looks wrong or stale, fix `context.md` and
+  regenerate — a hand edit to the generated file is silently overwritten.
+- **Announce yourself on the sync channel** before touching anything:
+  `PHEOBE_AS=<you> scripts/pheobe-sync read --tail 30`, then `claim` the
+  ticket or file, `post` blockers, `done` at handoff. Several agents work
+  this repo at once; this is how the last collision was caught (an agent
+  numbered its ticket PHEOBE-30 while foreman held PHEOBE-30 — it read the
+  channel, renumbered to 31, nothing was lost).
+- **Take the next ticket number from the channel and the `tickets/`
+  directory together**, not from the board alone — the board lags.
+- **Work in a worktree on a branch; never commit to `main`.** The parent
+  (whoever dispatched you, or the foreman) merges. Say in your `done` post
+  which branch and commit you landed, and whether you pushed.
+- **Record real decisions as you make them:** `dejavue decision "<title>"
+  --reason "…"` for anything a later reader would otherwise have to
+  reverse-engineer from a diff. Mechanical changes do not need this; an
+  architectural choice does.
+- **Live-verify before reporting done** — the same standard as a human
+  contributor, not a lower one. "The tests pass" is not the same claim as
+  "I ran the binary and watched it do the thing." When a route needs a model
+  or a network you do not have, say exactly that instead of claiming the
+  run.
+- **Do not invent scope.** If the task turns out to imply a `PHEOBE-N`-sized
+  change beyond what was asked, say so on the channel and confirm before
+  building it, rather than silently widening the branch.
+- **Ground SDK and CLI claims in the source.** Every adapter and adoption kit
+  in this repo cites the upstream repository or package version it was read
+  against (see `adopt/*/*.md`); a kit written from memory of an API is how
+  the cursor kit ended up with `disallowedTools` on a type that has no such
+  field (PHEOBE-23).
 
 ## Reporting a defect
 

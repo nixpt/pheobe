@@ -78,8 +78,9 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 - [x] PHEOBE-29 — knowledge drive mechanics: corpus compiled in, `ctx seed`, brief injects matching bodies, doctor counts
 - [x] promoted 2026-09-16: `nixpt/pheobe` public, v0.1.0 hand-tagged, v0.2.0 minted by release.yml, **pheobe 0.2.0 on crates.io**
 - [x] PHEOBE-30 — release.yml dispatches publish.yml at the minted tag (bot tags raise no push event)
+- [x] PHEOBE-33 — AGENTS.md + CLAUDE.md generated from `.dejavue/context.md`; agents section in CONTRIBUTING
 - [x] PHEOBE-31 — `pheobe doctor` prints compiled version vs crates.io / github tags
-- [x] PHEOBE-32 — `pheobe update` (`cargo install pheobe --locked --force`; git fallback)
+- [x] PHEOBE-32 — `pheobe update` (`cargo install pheobe --locked --force`; git fallback) — shipped as 0.3.0
 - [x] crates.io Trusted Publishing configured (captain, 2026-09-16), proven via `publish.yml verify_auth`; `CARGO_REGISTRY_TOKEN` secret deleted — publish.yml runs on OIDC only
 - [ ] decide whether the `/workspace/external/…` provenance citations in `adopt/` and
       `knowledge/` should ship in the crate as-is (PHEOBE-20 non-goal, flagged)
