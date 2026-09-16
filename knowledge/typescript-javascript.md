@@ -9,6 +9,9 @@ cutoff_gap: false
 tags: [typescript, javascript, node, passport, tooling, npm]
 sources:
   - DESIGN.md §"Language & framework competence" (pheobe repo — the passport table)
+  - Node.js docs — nodejs.org/docs (ESM vs CJS resolution, `package.json` `exports`)
+  - pnpm — pnpm.io · npm — docs.npmjs.com (lockfile names decide the package manager)
+  - TypeScript handbook + tsconfig reference — typescriptlang.org/tsconfig · vitest — vitest.dev · eslint — eslint.org
 ---
 
 ## What it is

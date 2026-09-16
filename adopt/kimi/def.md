@@ -8,7 +8,7 @@ note: this is the same Kimi CLI lineage cece-rs forked from, and the
 SDK's `kaos` paths / KAOS sandbox backends (BoxLite, E2B, Sprites) are
 the same exec-layer name cece-rs carried into the fleet.
 
-Source-grounded against `/workspace/external/kimi-agent-sdk`:
+Source-grounded against github.com/MoonshotAI/kimi-agent-sdk:
 `README.md` (thin-wrapper model, SDKs table) and
 `guides/python/quickstart.md` (env vars, `Config` object, config-file
 path, `prompt` / `Session` APIs, `yolo=True`).

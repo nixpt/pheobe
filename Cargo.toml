@@ -10,7 +10,7 @@ keywords = ["agent", "subagent", "coding-agent", "harness"]
 categories = ["command-line-utilities", "development-tools"]
 # src/, persona/, adopt/, knowledge/ (seed corpus) ship; the fleet planning
 # dir, release CI, and repo-local kit do not.
-exclude = [".jagent", ".github", "scripts", ".gitignore", "docs"]
+exclude = [".jagent", ".github", "scripts", ".gitignore", "docs", ".dejavue", ".gitattributes", "CLAUDE.md", "CONTRIBUTING.md"]
 
 [[bin]]
 name = "pheobe"

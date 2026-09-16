@@ -9,7 +9,9 @@ cutoff_gap: false
 tags: [rust, passport, tooling, cargo]
 sources:
   - DESIGN.md §"Language & framework competence" (pheobe repo — the passport table)
-  - .squad/research/language-implementation.md (adjacent — how languages get *built* and validated, not their tooling surface; no content overlap)
+  - cargo book — doc.rust-lang.org/cargo (workspaces, `[patch]`, features, `cargo package`)
+  - clippy lints — rust-lang.github.io/rust-clippy/master/ (each lint's rationale + `#[allow]` name)
+  - edition guide — doc.rust-lang.org/edition-guide (what `edition = "2024"` changes)
 ---
 
 ## What it is

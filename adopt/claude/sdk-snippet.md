@@ -6,7 +6,7 @@ ships the Claude Code CLI bundled, so this is the same substrate as the
 subprocess route — pick whichever the host prefers.
 
 Source-grounded: `AgentDefinition` in
-`/workspace/external/claude-agent-sdk-python/src/claude_agent_sdk/types.py`
+github.com/anthropics/claude-agent-sdk-python `src/claude_agent_sdk/types.py` (v0.2.153, PyPI `claude-agent-sdk`)
 (fields: `description`, `prompt`, `tools`, `disallowedTools`, `model`,
 `skills`, `mcpServers`, `maxTurns`).
 

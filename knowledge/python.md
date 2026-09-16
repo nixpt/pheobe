@@ -9,6 +9,9 @@ cutoff_gap: false
 tags: [python, passport, tooling, pytest]
 sources:
   - DESIGN.md §"Language & framework competence" (pheobe repo — the passport table)
+  - packaging guide — packaging.python.org (pyproject.toml, PEP 621 metadata, build backends)
+  - uv — docs.astral.sh/uv (lockfile `uv.lock`, `uv run`, `uv sync`) · ruff — docs.astral.sh/ruff
+  - pytest — docs.pytest.org (discovery rules, `-k`, `-x`, `--lf`)
 ---
 
 ## What it is

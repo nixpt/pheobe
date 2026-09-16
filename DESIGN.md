@@ -761,8 +761,8 @@ Env: `PHEOBE_PROVIDER=opencode` (default `openai`),
 
 ### Surface 3 — subagent defs (host mode kits) — source-grounded
 
-Read from `/workspace/external/opencode` (reference clone — ground truth
-on disk, don't recall it). What opencode actually provides:
+Read from the opencode source (github.com/anomalyco/opencode, v1.2.x —
+ground truth in the repo, don't recall it). What opencode actually provides:
 
 - **The subagent surface is the Task tool + the agent registry.**
   `Agent.Info` = `{ name, description, mode: "subagent"|"primary"|"all",
@@ -828,10 +828,10 @@ extended to emit all three files + the jsonc snippet.
 
 ## Claude integration (three surfaces — source-grounded)
 
-Reference material on disk: `claude` CLI 2.1.273 on this box,
-`/workspace/external/claude-agent-sdk-typescript` (SDK 0.3.273) and
-`/workspace/external/claude-agent-sdk-python` (SDK 0.2.153), plus the
-`ant` CLI 1.30.0 in `~/.local/bin` (typed Anthropic-API client, Go).
+Reference material: `claude` CLI 2.1.273,
+github.com/anthropics/claude-agent-sdk-typescript (v0.3.273) and
+github.com/anthropics/claude-agent-sdk-python (v0.2.153), plus the fleet's
+`ant` CLI 1.30.0 (typed Anthropic-API client, Go).
 
 The landscape (per docs + SDK source):
 
@@ -894,9 +894,8 @@ to emit the subagent def + the SDK-snippet variant.
 
 ## Cursor integration (source-grounded; worker-shaped only)
 
-Reference material on disk: `/workspace/external/cursor-sdks` —
-`@cursor/sdk` 1.0.31 (ts-src, unpacked from npm) + `cursor-sdk` Python
-1.0.31 (whl + unpacked src) + both doc sources (`docs-*.md`).
+Reference material: `@cursor/sdk` 1.0.31 (npm) + `cursor-sdk` 1.0.31
+(PyPI) + the SDK docs at cursor.com/docs/sdk (TypeScript and Python pages).
 
 **The structural difference from claude/opencode:** Cursor has **no
 completions endpoint at all** — their own docs state "the Cursor SDK is
@@ -956,10 +955,9 @@ on `AgentOptions`, not `AgentDefinition` (the latter has no tools field).
 
 ## Codex + Kimi integration (source-grounded)
 
-References on disk: `/workspace/external/codex-src` (openai/codex,
-sparse checkout of `sdk/python` — 5.3M),
-`/workspace/external/kimi-agent-sdk` (MoonshotAI, go/node/python — 4.1M),
-`/workspace/external/ai-sdk` (Vercel AI SDK providers + harness docs).
+References: github.com/openai/codex (`sdk/python`, PyPI `openai-codex`),
+github.com/MoonshotAI/kimi-agent-sdk (go/node/python),
+github.com/vercel/ai (Vercel AI SDK providers + harness docs).
 
 ### Codex (`openai-codex` Python SDK)
 
@@ -1007,7 +1005,7 @@ fleet-native since cece-rs already lives here).
 
 ### Vercel AI SDK harnesses — industry precedent for the `Worker` trait
 
-`/workspace/external/ai-sdk/` holds the providers page + three harness
+The Vercel AI SDK docs hold the providers page + three harness
 adapter docs (codex, claude-code, opencode). Vercel ships
 `@ai-sdk/harness` + `@ai-sdk/harness-codex|claude-code|opencode` adapters
 (experimental): a `HarnessAgent` connected to each coding agent through a

@@ -8,10 +8,11 @@ verified_by: nixp
 cutoff_gap: true
 tags: [crush, crush-ast, cast, casm, crush-vm, fleet-language, polyglot, exosphere]
 sources:
-  - canonical workspace: /workspace/projects/crush-ast (Cargo.toml v0.3.7 + crates/ listing, read 2026-09-16)
-  - lexer ground truth: /workspace/projects/crush-ast/crates/crush-frontend/src/parser/lexer.rs (keyword match, read 2026-09-16)
-  - /workspace/projects/exosphere/.jagent/skills/crush-lang/SKILL.md (syntax card + CASM categories; 2026-07-13, partially stale — see Gotchas)
-  - /workspace/projects/exosphere/.jagent/knowledge/architecture/crush_ast_peer_architecture.md (the peer split + walker design)
+  - canonical repo: github.com/nixpt/crush-ast (public; Cargo.toml v0.3.7 + crates/ listing, read 2026-09-16)
+  - lexer ground truth: crush-ast `crates/crush-frontend/src/parser/lexer.rs` (keyword match, read 2026-09-16)
+  - crates.io: `casm` 0.3.7, `crush-vm` 0.3.6, `crush-lint` 0.3.7, `tree-sitter-crush` 0.3.7, `crush-frontend` 0.3.0, `crush-cast` 0.3.0 (the last two lag the repo — use the repo for the frontend)
+  - language guide: github.com/nixpt/crush-language-guide (public mdBook)
+  - exosphere's in-tree crush-lang skill card (private fleet repo; 2026-07-13, partially stale — see Gotchas)
 ---
 
 ## What it is
@@ -23,8 +24,8 @@ training data. Two implementations exist — do not conflate them:
 
 | implementation | where | VM crate | status |
 |---|---|---|---|
-| **crush-ast** (standalone) | `projects/crush-ast/`, **v0.3.7, 43 crates** | `crush-vm` | **canonical source of truth** |
-| exosphere in-tree | `projects/exosphere/crates/core/` | `nanovm` (pre-rename, NOT migrated yet) | older twin; divergence tracked in exosphere `.jagent/planning/TASKS.md` |
+| **crush-ast** (standalone) | github.com/nixpt/crush-ast, **v0.3.7, 43 crates** | `crush-vm` | **canonical source of truth** |
+| exosphere in-tree | exosphere `crates/core/` (private fleet repo) | `nanovm` (pre-rename, NOT migrated yet) | older twin; divergence tracked in exosphere's board |
 
 Both lower to the same CASM. When writing Crush, the crush-ast lexer/compiler
 is ground truth — the exosphere skill doc (2026-07-13) predates the 0.3.x growth
@@ -33,9 +34,9 @@ is ground truth — the exosphere skill doc (2026-07-13) predates the 0.3.x grow
 Fleet ecosystem, so a task lands in the right repo: `crush-ast` (language + VM +
 walkers `crush-lang-{bash,c,custom,dart,go,java,js,nepali,python,rust,wasm,zig,zsh}`
 + `tree-sitter-crush`, `crush-lint`, `crush-pkg`, `crush-debugger`, `crush-aot`,
-`crush-jit`, `crush-ffi`) · `crush-workspace/` (crush-language-guide mdBook,
+`crush-jit`, `crush-ffi`) · the crush-workspace peers (crush-language-guide mdBook — public —,
 crush-lsp, crush-notebook, polydex, crush-visuals, crush-vscode) ·
-`crush-capsules/` (CRUSH capsule ecosystem) · exosphere (Crush as conductor +
+crush-capsules (CRUSH capsule ecosystem, inactive) · exosphere (Crush as conductor +
 agent front-end; CrushVM sandbox gap tracked in v1.0 planning) · polydex indexes
 `.crush` via tree-sitter-crush.
 
@@ -83,5 +84,5 @@ CASM → crush-vm. `Program.cast_version` is required. AI-native node types:
   code silently does nothing — verify a walker covers it before relying on
   `@lang` blocks.
 - exosphere's in-tree docs may cite `nanovm` — same VM family, older name.
-  `cargo test -p crush-frontend -p crush-cast -p crush-vm` (in crush-ast) is
-  the health check; full guide: `projects/crush-workspace/crush-language-guide/`.
+  `cargo test -p crush-frontend -p crush-cast -p crush-vm` (in a crush-ast
+  checkout) is the health check; full guide: github.com/nixpt/crush-language-guide.
