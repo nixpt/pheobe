@@ -6,6 +6,7 @@ mod agent_loop;
 mod aging;
 mod claude;
 mod contract;
+mod cursor;
 mod e2e;
 mod gates;
 mod opencode;

@@ -57,6 +57,8 @@ CLI path implemented (decision recorded in the ticket): spawns
 Defensive stdout parse: single JSON object, per-line stream, or the whole
 stdout as prose. usage.tokens / usage.total_tokens → budget estimator;
 report-contract final message → json_tail. Sandbox tier mapping onto
-`--sandbox` left for the @cursor/sdk follow-up (getUsage real-USD + steer).
+`--sandbox` left for PHEOBE-23 (CLI `--sandbox enabled|disabled` maps
+the two-valued Cursor sandbox; `@cursor/sdk` getUsage + steer still
+deferred — Worker is one-shot).
 8 cursor_ tests; registry now resolves cursor. Live smoke deferred:
 CURSOR_API_KEY absent on this box.

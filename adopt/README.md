@@ -12,7 +12,7 @@ installs the same contract; only the wiring differs per host.
 | opencode | host (agent def) | `adopt/opencode/pheobe-host.md` | `pheobe adopt opencode` |
 | opencode | jsonc registration + sandbox mapping | `adopt/opencode/opencode.jsonc-snippet.md` | `pheobe adopt opencode-self` (combined: self-agent + snippet) |
 | codex | self (bash tool) + SDK snippet | `adopt/codex/README.md`, `adopt/codex/sdk-snippet.md` | `pheobe adopt codex` |
-| cursor | host (`local.agents` def + hooks) | `adopt/cursor/def.md` | `pheobe adopt cursor` |
+| cursor | host (SDK `Agent.create` + IDE `~/.cursor/agents/` + CLI `--sandbox`) | `adopt/cursor/def.md`, `adopt/cursor/pheobe-host.md` | `pheobe adopt cursor` |
 | kimi | self (config def + provider env) | `adopt/kimi/def.md` | `pheobe adopt kimi` |
 
 ## Install

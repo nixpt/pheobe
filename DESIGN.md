@@ -947,8 +947,10 @@ subprocess), `CURSOR_API_KEY` auth, `mode="agent"`, sandbox tier =
 `local.sandboxOptions.enabled` (strict/moderate) vs hooks (free),
 `budget.max_usd` enforced from `getUsage()` (real dollars), aging
 injects delivered via `run.steer()` at warn/narrow, `run.cancel()` on
-expiry. Plus `pheobe adopt cursor` emitting the `local.agents` def +
-hook config snippet.
+expiry. Plus `pheobe adopt cursor` emitting the SDK `local.agents` def,
+the IDE `~/.cursor/agents/pheobe.md` host protocol, hooks.json v1, and
+the CLI `--sandbox` map (PHEOBE-23). `disallowedTools: ["task"]` belongs
+on `AgentOptions`, not `AgentDefinition` (the latter has no tools field).
 
 ## Codex + Kimi integration (source-grounded)
 
@@ -1057,7 +1059,7 @@ from ttl/budget at intake.
 | `adopt/opencode/self-agent.md` + `opencode.jsonc-snippet.md` | opencode markdown agent (tool-restricted) + registration | self |
 | `adopt/opencode/pheobe-host.md` | opencode agent embedding the loop protocol (opencode agents are exactly this shape — prompt + tool gating, parent's model) | host |
 | `adopt/codex/README.md` + `sdk-snippet.md` | no native subagents — bash-tool invocation | self |
-| `adopt/cursor/def.md` | cursor `local.agents` def + hooks | host |
+| `adopt/cursor/def.md` + `pheobe-host.md` | cursor SDK `Agent.create` / IDE `~/.cursor/agents/` / CLI `--sandbox` | host |
 | `adopt/kimi/def.md` | kimi code def + provider env | self |
 | (none) | claude host mode: no kit yet — the opencode host protocol was used as-is in the s457 test; a claude subagent def carrying the same protocol would make it native | host |
 | bro | ACP: `pheobe acp --stdio` ↔ `bro synapse dispatch --` — no kit file, the binary is the kit | self |
