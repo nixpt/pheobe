@@ -1,28 +1,42 @@
 # Planning state — pheobe
 
-**Updated:** 2026-09-16
-**Milestone focus:** M0 — the loop exists; exit gate must pass a real run
+**Updated:** 2026-09-16 (foreman s457)
+**Milestone focus:** M2 — proven adoptable and published; now fidelity + coverage
 
-**Branch:** `main` — PHEOBE-1 (model turn), PHEOBE-2 (aging ladder), PHEOBE-3
-(all three field defects fixed, issues 01-03 closed) merged; designs for
-sandbox ladder + loops/graphs + host integrations (opencode/claude/codex/
-cursor/kimi/ai-sdk) landed. Verified live 2026-09-16 twice: foreman s456 (Zen, 3 models — exit-gate
-defects found), then W0 dogfood (PHEOBE-13) on fixed main: deepseek-v4-pro
-(5 turns), kimi-k2.6 (8), glm-5.2 (6) — all `ok:true`, one `calc.py`-only
-commit each with Pheobe-Task trailer, aging hard-stop and vague-ask
-rejection verified live. Issue 04 filed (failed model run leaves empty
-worktree).
+**Branch:** `main` @ crates.io 0.3.0. Public on GitHub since 2026-09-16
+(v0.1.0 hand-tagged, v0.2.0 and v0.3.0 minted by `release.yml`, published by
+`publish.yml` over OIDC — the whole chain has run unattended once).
 
-## Wave plan (sub-agent-ready batches)
+**What is real (verified live, same day):** self mode over flownet
+(`cc-kimi-k3`) and Zen free tier; host mode with `pheobe host setup/finish`
++ `pheobe verify`; worker adapters claude (live e2e), opencode server layer
+(`--attach`, live paid + free), cursor (SDK-grounded, PHEOBE-23), codex
+(static SDK check), agy (adapter + kit); ACP server; knowledge drive
+compiled in (`ctx seed`, matching bodies in the brief); `pheobe update`.
+148 tests, clippy `-D warnings` + fmt clean, `cargo package` in CI.
 
-| wave | tickets | runs-in-parallel? | notes |
-|---|---|---|---|
-| W0 | PHEOBE-13 (dogfood Zen, P0) | solo | field-verify the fixed exit gate before anything else |
-| W1 | PHEOBE-9 (Worker trait) + PHEOBE-10 (barn hardening) + PHEOBE-12 (knowledge seed) + PHEOBE-15 (adopt kits) | DONE 2026-09-16 — 4 parallel sub-agents, 4 worktrees, merged sequentially (34 tests green on main) | main.rs/tests.rs conflicts resolved by hand (kept both test blocks) |
-| W2 | PHEOBE-4, 5, 7 (opencode, claude, codex adapters) | DONE 2026-09-16 — 3 parallel sub-agents; all three live-smoked green (opencode `step_finish` tokens, claude full-run ok:true, codex exec CLI path) | 60 tests on main; CLI-first decision for codex recorded; wait-timeout dep added by PHEOBE-5 |
-| W3 | PHEOBE-14 (sandbox impl) + PHEOBE-11 (structural ladder) + PHEOBE-6 (cursor adapter) | yes | independent surfaces |
-| W4 | PHEOBE-8 (kimi) + PHEOBE-16 (memory swap) + PHEOBE-17 (acp) | mostly | 16 touches learn.rs which 8 may read |
-| W5 | PHEOBE-18 (release posture) | solo | after dogfood + quartet |
+**Coverage (cargo-llvm-cov, 2026-09-16):** 79.31% lines / 77.69% regions.
+`main.rs` 0% (no CLI tests — PHEOBE-34), `tools/search.rs` 14% (PHEOBE-35),
+`memory.rs` 62% (host store), `update.rs` 69% (live probe + install spawn).
+
+**Open:** issue 10 (ETXTBSY test flake, P4); PHEOBE-34/35 (coverage);
+kimi adapter never run live; a native claude host kit (gap in DESIGN's kit
+table); sandbox-tier mapping table across adapters; free-tier opencode
+budget note in the adapter doc.
+
+## Waves (history)
+
+| wave | tickets | outcome |
+|---|---|---|
+| W0 | PHEOBE-13 dogfood | 3 Zen models `ok:true`; exit-gate defects 01–03 found and fixed |
+| W1 | 9, 10, 12, 15 | Worker trait, barn hardening, knowledge seed, adopt kits — 4 parallel worktrees |
+| W2 | 4, 5, 7 | opencode / claude / codex adapters, each live-smoked |
+| W3 | 14, 11, 6 | sandbox ladder, structural ladder, cursor adapter |
+| W4 | 8, 16, 17 | kimi adapter, memory trait swap, ACP server |
+| W5 | 18, 20, 27, 28, 30, 33 | release posture, RC audit, remote + channel, docs/dejavue/provenance, publish dispatch, AGENTS.md |
+| W6 | 21, 22, 23, 24, 25, 26, 29, 31, 32 | LOC budget, worker-route fidelity (issues 05–09), cursor SDK/CLI alignment, sync channel, agy adapter, host supervisor, knowledge mechanics, doctor version, update |
 
 RULES.md applies recursively: new defects found during any wave get their
-own issue; tickets' `Status` flips with a `## Resolution` section.
+own issue; tickets' `Status` flips with a `## Resolution` section. Live
+coordination runs on `scripts/pheobe-sync`; several agents (foreman, cursor,
+codex, agy, the captain's sessions) work `main` concurrently.
