@@ -2,7 +2,9 @@
 
 **Found:** 2026-09-16, codex adoption exploration (read-only, sandboxed):
 `cursor_*`/`codex_*` adapter tests failed once with "Text file busy" and
-passed on retry. Not reproduced in ~8 full-suite runs on the foreman box.
+passed on retry. Reproduced once on the foreman box while verifying PHEOBE-25
+(`worker_codex::tests::codex_failed_run_surfaces_the_stderr_tail`, panic at
+`worker_codex.rs:377`; green alone and on 3 immediate re-runs).
 **Severity:** P4 — flake, no wrong behaviour; costs a retry.
 
 ## Mechanism
