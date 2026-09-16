@@ -105,8 +105,7 @@ fn parse_entry(path: &Path) -> Option<Entry> {
         }
     }
     let slug = slug.or_else(|| {
-        path
-            .file_stem()
+        path.file_stem()
             .and_then(|s| s.to_str())
             .map(|s| s.to_string())
     })?;
@@ -157,9 +156,7 @@ pub fn scan(dir: &Path) -> Result<Vec<Entry>> {
     for f in std::fs::read_dir(dir)? {
         let f = f?;
         let p = f.path();
-        let keep = p
-            .extension()
-            .is_some_and(|e| e == "md")
+        let keep = p.extension().is_some_and(|e| e == "md")
             && p.file_name()
                 .and_then(|n| n.to_str())
                 .map(|n| !n.starts_with('_') && n != "README.md")

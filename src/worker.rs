@@ -41,10 +41,10 @@ pub trait Worker {
 type WorkerFactory = fn() -> Result<Arc<dyn Worker>>;
 const REGISTRY: &[(&str, WorkerFactory)] = &[
     ("opencode", crate::worker_opencode::worker as WorkerFactory), // PHEOBE-4
-    ("claude", crate::worker_claude::worker as WorkerFactory), // PHEOBE-5
-    ("codex", crate::worker_codex::worker as WorkerFactory), // PHEOBE-7
-    ("cursor", crate::worker_cursor::worker as WorkerFactory), // PHEOBE-6
-    ("kimi", crate::worker_kimi::worker as WorkerFactory), // PHEOBE-8
+    ("claude", crate::worker_claude::worker as WorkerFactory),     // PHEOBE-5
+    ("codex", crate::worker_codex::worker as WorkerFactory),       // PHEOBE-7
+    ("cursor", crate::worker_cursor::worker as WorkerFactory),     // PHEOBE-6
+    ("kimi", crate::worker_kimi::worker as WorkerFactory),         // PHEOBE-8
 ];
 
 /// Resolve a `PHEOBE_PROVIDER` name. `Ok(None)` = the built-in per-turn

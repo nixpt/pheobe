@@ -187,7 +187,11 @@ fn usage_tokens(v: &Value) -> Option<u64> {
             let mut total = 0u64;
             let mut any = false;
             for key in ["input_tokens", "output_tokens"] {
-                if let Some(t) = v.get("usage").and_then(|u| u.get(key)).and_then(|t| t.as_u64()) {
+                if let Some(t) = v
+                    .get("usage")
+                    .and_then(|u| u.get(key))
+                    .and_then(|t| t.as_u64())
+                {
                     total += t;
                     any = true;
                 }
@@ -268,10 +272,8 @@ mod tests {
     #[test]
     fn kimi_argv_shape_worktree_prompt_and_stdout_parse() {
         let dir = scratch("argv");
-        let (script, captured) = capture_kimi(
-            &dir,
-            r#"{"message":"done ok","usage":{"tokens":55}}"#,
-        );
+        let (script, captured) =
+            capture_kimi(&dir, r#"{"message":"done ok","usage":{"tokens":55}}"#);
         with_kimi_bin(&script, || {
             let w = KimiWorker;
             let out = w.run("refactor foo", &dir).unwrap();
@@ -295,8 +297,7 @@ mod tests {
     #[test]
     fn kimi_flags_replace_not_append() {
         let dir = scratch("flags");
-        let (script, captured) =
-            capture_kimi(&dir, r#"{"message":"ok"}"#);
+        let (script, captured) = capture_kimi(&dir, r#"{"message":"ok"}"#);
         unsafe { std::env::set_var("PHEOBE_KIMI_FLAGS", "--afk") };
         with_kimi_bin(&script, || {
             let out = KimiWorker.run("x", &dir).unwrap();
@@ -305,7 +306,10 @@ mod tests {
         unsafe { std::env::remove_var("PHEOBE_KIMI_FLAGS") };
         let args = std::fs::read_to_string(&captured).unwrap();
         assert!(args.contains("--afk"));
-        assert!(!args.contains("--yolo"), "PHEOBE_KIMI_FLAGS must replace the default");
+        assert!(
+            !args.contains("--yolo"),
+            "PHEOBE_KIMI_FLAGS must replace the default"
+        );
     }
 
     #[test]
@@ -347,8 +351,9 @@ mod tests {
     #[test]
     fn kimi_content_parts_concat_as_final_text() {
         let dir = scratch("parts");
-        let body = "printf '%s\\n' '{\"content\":[{\"text\":\"part one\"},{\"text\":\"part two\"}]}'"
-            .to_string();
+        let body =
+            "printf '%s\\n' '{\"content\":[{\"text\":\"part one\"},{\"text\":\"part two\"}]}'"
+                .to_string();
         let script = fake_kimi(&dir, "kimi", &body);
         with_kimi_bin(&script, || {
             let out = KimiWorker.run("x", &dir).unwrap();

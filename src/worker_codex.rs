@@ -100,7 +100,13 @@ impl Worker for CodexWorker {
             prompt.push_str(STRICT_NOTE);
         }
         let out = Command::new(&self.bin)
-            .args(["exec", "--json", "--skip-git-repo-check", "--sandbox", sandbox])
+            .args([
+                "exec",
+                "--json",
+                "--skip-git-repo-check",
+                "--sandbox",
+                sandbox,
+            ])
             .arg(&prompt)
             .current_dir(worktree)
             .output()
@@ -113,11 +119,7 @@ impl Worker for CodexWorker {
             })?;
         if !out.status.success() {
             let stderr = String::from_utf8_lossy(&out.stderr);
-            bail!(
-                "codex exec exited with {}: {}",
-                out.status,
-                stderr.trim()
-            );
+            bail!("codex exec exited with {}: {}", out.status, stderr.trim());
         }
         parse_jsonl(&String::from_utf8_lossy(&out.stdout))
     }
@@ -134,7 +136,9 @@ fn parse_jsonl(stdout: &str) -> Result<WorkerOutcome> {
         if line.is_empty() {
             continue;
         }
-        let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
+        let Ok(v) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
         match v.get("type").and_then(|t| t.as_str()) {
             Some("item.completed") => {
                 let item = &v["item"];
@@ -176,7 +180,12 @@ fn parse_jsonl(stdout: &str) -> Result<WorkerOutcome> {
     } else {
         None
     };
-    Ok(WorkerOutcome { final_text, tokens, usd: None, json_tail })
+    Ok(WorkerOutcome {
+        final_text,
+        tokens,
+        usd: None,
+        json_tail,
+    })
 }
 
 fn truncate(s: &str) -> &str {
@@ -196,9 +205,14 @@ mod tests {
     use super::*;
 
     fn scratch(name: &str) -> std::path::PathBuf {
-        let dir = std::env::temp_dir()
-            .join(format!("pheobe-codex-{name}-{}-{}", std::process::id(), std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let dir = std::env::temp_dir().join(format!(
+            "pheobe-codex-{name}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
         std::fs::create_dir_all(&dir).unwrap();
         dir
     }
@@ -218,15 +232,22 @@ mod tests {
 
     fn outcome_dir(dir: &Path) -> WorkerOutcome {
         // a canned --json event stream, the shape the real binary prints
-        let script = fake_codex(dir, "codex", r#"cat <<'EOF'
+        let script = fake_codex(
+            dir,
+            "codex",
+            r#"cat <<'EOF'
 {"type":"thread.started","thread_id":"t1"}
 {"type":"turn.started"}
 {"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"fixed the parser and reran the suite"}}
 {"type":"item.completed","item":{"id":"item_1","type":"agent_message","text":"done — parser fixed, suite green"}}
 {"type":"turn.completed","usage":{"input_tokens":100,"cached_input_tokens":50,"cache_write_input_tokens":0,"output_tokens":7,"reasoning_output_tokens":3}}
 EOF
-"#);
-        let worker = CodexWorker { bin: script.to_string_lossy().into(), tier: "moderate".into() };
+"#,
+        );
+        let worker = CodexWorker {
+            bin: script.to_string_lossy().into(),
+            tier: "moderate".into(),
+        };
         worker.run("the prompt", dir).unwrap()
     }
 
@@ -253,7 +274,10 @@ EOF
         assert_eq!(sandbox_flag("moderate").unwrap(), "workspace-write");
         assert_eq!(sandbox_flag("free").unwrap(), "danger-full-access");
         let err = format!("{:#}", sandbox_flag("chaos").unwrap_err());
-        assert!(err.contains("unknown PHEOBE_SANDBOX tier 'chaos'"), "got: {err}");
+        assert!(
+            err.contains("unknown PHEOBE_SANDBOX tier 'chaos'"),
+            "got: {err}"
+        );
         assert!(err.contains("strict | moderate | free"), "got: {err}");
     }
 
@@ -261,8 +285,15 @@ EOF
     fn codex_final_text_and_tokens_extracted_from_the_jsonl_tail() {
         let dir = scratch("jsonl");
         let out = outcome_dir(&dir);
-        assert_eq!(out.final_text, "done — parser fixed, suite green", "last agent_message wins");
-        assert_eq!(out.tokens, Some(110), "input + output + reasoning, cached input is a subset");
+        assert_eq!(
+            out.final_text, "done — parser fixed, suite green",
+            "last agent_message wins"
+        );
+        assert_eq!(
+            out.tokens,
+            Some(110),
+            "input + output + reasoning, cached input is a subset"
+        );
         assert_eq!(out.usd, None, "codex reports no USD cost");
         assert_eq!(out.json_tail, None, "prose is prose");
         std::fs::remove_dir_all(&dir).ok();
@@ -272,8 +303,13 @@ EOF
     fn codex_argv_shape_cwd_and_tier_reach_the_binary() {
         let dir = scratch("argv");
         let (script, capture) = capture_codex(&dir, "ok");
-        let worker = CodexWorker { bin: script.to_string_lossy().into(), tier: "moderate".into() };
-        let out = worker.run("do the thing\ndone_when: `cargo test`", &dir).unwrap();
+        let worker = CodexWorker {
+            bin: script.to_string_lossy().into(),
+            tier: "moderate".into(),
+        };
+        let out = worker
+            .run("do the thing\ndone_when: `cargo test`", &dir)
+            .unwrap();
         assert_eq!(out.final_text, "ok");
         let captured = std::fs::read_to_string(&capture).unwrap();
         let lines: Vec<&str> = captured.lines().collect();
@@ -282,12 +318,19 @@ EOF
         assert_eq!(lines[2], "--skip-git-repo-check");
         assert_eq!(lines[3], "--sandbox");
         assert_eq!(lines[4], "workspace-write", "default tier is moderate");
-        assert!(captured.contains("done_when"), "the whole prompt is one argv element");
+        assert!(
+            captured.contains("done_when"),
+            "the whole prompt is one argv element"
+        );
         assert!(
             captured.contains("no `handoff` tool"),
             "the final-message report contract rides along, got: {captured}"
         );
-        assert_eq!(lines[lines.len() - 1], &format!("CWD={}", dir.display()), "cwd = worktree");
+        assert_eq!(
+            lines[lines.len() - 1],
+            &format!("CWD={}", dir.display()),
+            "cwd = worktree"
+        );
         std::fs::remove_dir_all(&dir).ok();
     }
 
@@ -295,10 +338,16 @@ EOF
     fn codex_strict_tier_runs_read_only_and_carries_the_allowlist_note() {
         let dir = scratch("strict");
         let (script, capture) = capture_codex(&dir, "ok");
-        let worker = CodexWorker { bin: script.to_string_lossy().into(), tier: "strict".into() };
+        let worker = CodexWorker {
+            bin: script.to_string_lossy().into(),
+            tier: "strict".into(),
+        };
         worker.run("analyze only", &dir).unwrap();
         let captured = std::fs::read_to_string(&capture).unwrap();
-        assert!(captured.contains("--sandbox\nread-only"), "strict = read-only, got: {captured}");
+        assert!(
+            captured.contains("--sandbox\nread-only"),
+            "strict = read-only, got: {captured}"
+        );
         assert!(
             captured.contains("read-only sandbox"),
             "the allowlist note rides along, got: {captured}"
@@ -309,35 +358,63 @@ EOF
     #[test]
     fn codex_missing_binary_errors_clearly() {
         let dir = scratch("missing");
-        let worker = CodexWorker { bin: "/nonexistent/pheobe-fake-codex".into(), tier: "moderate".into() };
+        let worker = CodexWorker {
+            bin: "/nonexistent/pheobe-fake-codex".into(),
+            tier: "moderate".into(),
+        };
         let err = format!("{:#}", worker.run("x", &dir).unwrap_err());
-        assert!(err.contains("failed to spawn '/nonexistent/pheobe-fake-codex exec'"), "got: {err}");
-        assert!(err.contains("PHEOBE_CODEX_BIN"), "names the env override, got: {err}");
+        assert!(
+            err.contains("failed to spawn '/nonexistent/pheobe-fake-codex exec'"),
+            "got: {err}"
+        );
+        assert!(
+            err.contains("PHEOBE_CODEX_BIN"),
+            "names the env override, got: {err}"
+        );
         std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]
     fn codex_failed_run_surfaces_the_stderr_tail() {
         let dir = scratch("failed");
-        let script = fake_codex(dir.as_path(), "codex", "echo 'nope: bad config' >&2; exit 1");
-        let worker = CodexWorker { bin: script.to_string_lossy().into(), tier: "moderate".into() };
+        let script = fake_codex(
+            dir.as_path(),
+            "codex",
+            "echo 'nope: bad config' >&2; exit 1",
+        );
+        let worker = CodexWorker {
+            bin: script.to_string_lossy().into(),
+            tier: "moderate".into(),
+        };
         let err = format!("{:#}", worker.run("x", &dir).unwrap_err());
         assert!(err.contains("exited with"), "got: {err}");
-        assert!(err.contains("nope: bad config"), "stderr tail included, got: {err}");
+        assert!(
+            err.contains("nope: bad config"),
+            "stderr tail included, got: {err}"
+        );
         std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]
     fn codex_json_report_contract_becomes_the_json_tail() {
         let dir = scratch("tail");
-        let script = fake_codex(dir.as_path(), "codex", r#"cat <<'EOF'
+        let script = fake_codex(
+            dir.as_path(),
+            "codex",
+            r#"cat <<'EOF'
 {"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"{\"ok\":true,\"summary\":\"landed the fix\",\"next_steps\":[\"merge\"],\"doubts\":[]}"}}
 {"type":"turn.completed","usage":{"input_tokens":5,"output_tokens":5}}
 EOF
-"#);
-        let worker = CodexWorker { bin: script.to_string_lossy().into(), tier: "moderate".into() };
+"#,
+        );
+        let worker = CodexWorker {
+            bin: script.to_string_lossy().into(),
+            tier: "moderate".into(),
+        };
         let out = worker.run("x", &dir).unwrap();
-        let tail = out.json_tail.expect("report-contract object becomes the tail");
+        let tail = out
+            .json_tail
+            .expect("report-contract object becomes the tail");
         assert_eq!(tail["summary"], "landed the fix");
         assert_eq!(tail["ok"], true);
         std::fs::remove_dir_all(&dir).ok();
@@ -346,14 +423,26 @@ EOF
     #[test]
     fn codex_empty_blocked_in_the_tail_is_not_a_block() {
         let dir = scratch("empty-blocked");
-        let script = fake_codex(dir.as_path(), "codex", r#"cat <<'EOF'
+        let script = fake_codex(
+            dir.as_path(),
+            "codex",
+            r#"cat <<'EOF'
 {"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"{\"ok\":true,\"summary\":\"landed\",\"blocked\":\"\"}"}}
 EOF
-"#);
-        let worker = CodexWorker { bin: script.to_string_lossy().into(), tier: "moderate".into() };
+"#,
+        );
+        let worker = CodexWorker {
+            bin: script.to_string_lossy().into(),
+            tier: "moderate".into(),
+        };
         let out = worker.run("x", &dir).unwrap();
-        let tail = out.json_tail.expect("report-contract object becomes the tail");
-        assert!(tail.get("blocked").is_none(), "empty blocked is a non-block, got: {tail}");
+        let tail = out
+            .json_tail
+            .expect("report-contract object becomes the tail");
+        assert!(
+            tail.get("blocked").is_none(),
+            "empty blocked is a non-block, got: {tail}"
+        );
         assert_eq!(tail["ok"], true);
         std::fs::remove_dir_all(&dir).ok();
     }
@@ -364,11 +453,18 @@ EOF
         static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
         let _guard = ENV_LOCK.lock().unwrap();
         let dir = scratch("registry");
-        let script = fake_codex(dir.as_path(), "codex", r#"echo '{"type":"item.completed","item":{"id":"i","type":"agent_message","text":"ok"}}'"#);
+        let script = fake_codex(
+            dir.as_path(),
+            "codex",
+            r#"echo '{"type":"item.completed","item":{"id":"i","type":"agent_message","text":"ok"}}'"#,
+        );
         std::env::set_var("PHEOBE_CODEX_BIN", script.to_string_lossy().into_owned());
         std::env::set_var("PHEOBE_SANDBOX", "chaos");
         let err = format!("{:#}", CodexWorker::from_env().unwrap_err());
-        assert!(err.contains("unknown PHEOBE_SANDBOX tier 'chaos'"), "got: {err}");
+        assert!(
+            err.contains("unknown PHEOBE_SANDBOX tier 'chaos'"),
+            "got: {err}"
+        );
         std::env::remove_var("PHEOBE_SANDBOX");
         let w = CodexWorker::from_env().unwrap();
         assert_eq!(w.tier, "moderate", "unset env defaults to moderate");

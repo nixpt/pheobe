@@ -22,7 +22,15 @@ pub fn run_done_when(task: &Task, cwd: &Path) -> Result<TestEvidence> {
                 String::from_utf8_lossy(&out.stdout),
                 String::from_utf8_lossy(&out.stderr)
             );
-            let excerpt: String = combined.lines().rev().take(20).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join("\n");
+            let excerpt: String = combined
+                .lines()
+                .rev()
+                .take(20)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect::<Vec<_>>()
+                .join("\n");
             let parsed = crate::testparse::parse(&combined);
             Ok(TestEvidence {
                 ran: run.clone(),

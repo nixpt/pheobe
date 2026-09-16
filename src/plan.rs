@@ -59,7 +59,10 @@ pub fn validate_steps(steps: &[Step]) -> std::result::Result<(), String> {
         }
     }
     if let Some(cyc) = find_cycle(steps) {
-        let named: Vec<String> = cyc.iter().map(|&i| format!("{i} ('{}')", steps[i].desc)).collect();
+        let named: Vec<String> = cyc
+            .iter()
+            .map(|&i| format!("{i} ('{}')", steps[i].desc))
+            .collect();
         return Err(format!("cycle_detected: [{}]", named.join(" -> ")));
     }
     for (i, s) in steps.iter().enumerate() {

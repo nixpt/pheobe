@@ -26,7 +26,11 @@ fn registry(worktree: &Path) -> std::path::PathBuf {
 }
 
 fn git(wt: &Path, args: &[&str]) -> Result<String> {
-    let out = std::process::Command::new("git").arg("-C").arg(wt).args(args).output()?;
+    let out = std::process::Command::new("git")
+        .arg("-C")
+        .arg(wt)
+        .args(args)
+        .output()?;
     let combined = format!(
         "{}{}",
         String::from_utf8_lossy(&out.stdout),
@@ -59,7 +63,9 @@ fn short(sha: &str) -> String {
 /// Snapshot the current dirty state under `name`. Never touches the working tree.
 pub fn create(worktree: &Path, name: &str) -> Result<String> {
     if name.is_empty()
-        || !name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))
+        || !name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))
     {
         bail!("checkpoint name must be letters, digits, dot, dash, or underscore: '{name}'");
     }
@@ -68,16 +74,35 @@ pub fn create(worktree: &Path, name: &str) -> Result<String> {
     let stash = if stash_sha.is_empty() {
         None
     } else {
-        git(worktree, &["stash", "store", "-m", &format!("pheobe-checkpoint: {name}"), &stash_sha])?;
+        git(
+            worktree,
+            &[
+                "stash",
+                "store",
+                "-m",
+                &format!("pheobe-checkpoint: {name}"),
+                &stash_sha,
+            ],
+        )?;
         Some(stash_sha)
     };
     let mut cps = load(worktree)?;
     cps.retain(|c| c.name != name); // upsert by name
     let msg = match &stash {
-        Some(s) => format!("created '{}' (head={}, stash={})", name, short(&head), short(s)),
+        Some(s) => format!(
+            "created '{}' (head={}, stash={})",
+            name,
+            short(&head),
+            short(s)
+        ),
         None => format!("created '{}' (head={}, tree was clean)", name, short(&head)),
     };
-    cps.push(Checkpoint { name: name.into(), ts: now_ts(), head, stash });
+    cps.push(Checkpoint {
+        name: name.into(),
+        ts: now_ts(),
+        head,
+        stash,
+    });
     save(worktree, &cps)?;
     Ok(msg)
 }
@@ -97,7 +122,10 @@ pub fn restore(worktree: &Path, name: &str) -> Result<String> {
         None => bail!("checkpoint '{name}' had no uncommitted state to restore (tree was clean)"),
     };
     git(worktree, &["stash", "apply", &stash])?;
-    Ok(format!("restored '{name}' — applied stash {}", short(&stash)))
+    Ok(format!(
+        "restored '{name}' — applied stash {}",
+        short(&stash)
+    ))
 }
 
 /// Keep only the newest `keep` checkpoints; pruned stash objects are dropped

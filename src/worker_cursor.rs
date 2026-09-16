@@ -52,16 +52,15 @@ pub struct CursorWorker;
 impl Worker for CursorWorker {
     fn run(&self, prompt: &str, worktree: &Path) -> Result<WorkerOutcome> {
         let bin = std::env::var("PHEOBE_CURSOR_BIN").unwrap_or_else(|_| DEFAULT_BIN.to_string());
-        let flags = std::env::var("PHEOBE_CURSOR_FLAGS").unwrap_or_else(|_| DEFAULT_FLAGS.to_string());
+        let flags =
+            std::env::var("PHEOBE_CURSOR_FLAGS").unwrap_or_else(|_| DEFAULT_FLAGS.to_string());
         let timeout = std::env::var("PHEOBE_CURSOR_TIMEOUT_SECS")
             .ok()
             .and_then(|v| v.parse::<u64>().ok())
             .unwrap_or(DEFAULT_TIMEOUT_SECS);
 
         let mut cmd = std::process::Command::new(&bin);
-        cmd.arg("-p")
-            .arg("--output-format")
-            .arg("json");
+        cmd.arg("-p").arg("--output-format").arg("json");
         cmd.args(flags.split_whitespace());
         cmd.arg(prompt);
         cmd.current_dir(worktree);
@@ -76,8 +75,14 @@ impl Worker for CursorWorker {
             )
         })?;
 
-        let mut out_pipe = child.stdout.take().context("cursor worker: no stdout pipe")?;
-        let mut err_pipe = child.stderr.take().context("cursor worker: no stderr pipe")?;
+        let mut out_pipe = child
+            .stdout
+            .take()
+            .context("cursor worker: no stdout pipe")?;
+        let mut err_pipe = child
+            .stderr
+            .take()
+            .context("cursor worker: no stderr pipe")?;
         let stdout_reader = std::thread::spawn(move || {
             let mut buf = String::new();
             let _ = out_pipe.read_to_string(&mut buf);
@@ -137,7 +142,12 @@ fn parse_stdout(raw: &str) -> WorkerOutcome {
             return from_result_object(&v);
         }
     }
-    WorkerOutcome { final_text: raw.to_string(), tokens: None, usd: None, json_tail: None }
+    WorkerOutcome {
+        final_text: raw.to_string(),
+        tokens: None,
+        usd: None,
+        json_tail: None,
+    }
 }
 
 /// Extract a `WorkerOutcome` from one cursor result JSON object. The fields
@@ -158,9 +168,15 @@ fn from_result_object(v: &Value) -> WorkerOutcome {
             v.get("usage")
                 .and_then(|u| u.get("total_tokens").and_then(|t| t.as_u64()))
         });
-    let json_tail =
-        serde_json::from_str::<Value>(&final_text).ok().filter(|j| j.is_object());
-    WorkerOutcome { final_text, tokens, usd: None, json_tail }
+    let json_tail = serde_json::from_str::<Value>(&final_text)
+        .ok()
+        .filter(|j| j.is_object());
+    WorkerOutcome {
+        final_text,
+        tokens,
+        usd: None,
+        json_tail,
+    }
 }
 
 fn stderr_tail(stderr: &str) -> String {
@@ -212,7 +228,10 @@ mod tests {
         path
     }
 
-    fn capture_cursor(dir: &std::path::Path, final_text: &str) -> (std::path::PathBuf, std::path::PathBuf) {
+    fn capture_cursor(
+        dir: &std::path::Path,
+        final_text: &str,
+    ) -> (std::path::PathBuf, std::path::PathBuf) {
         let capture = dir.join("captured.txt");
         let json = serde_json::json!({
             "content": final_text,
@@ -245,7 +264,11 @@ mod tests {
         assert_eq!(lines[3], "--yolo", "default flags apply");
         assert_eq!(lines[4], "--trust");
         assert_eq!(lines[5], "do the thing", "prompt is one argv element");
-        assert_eq!(lines[lines.len() - 1], &format!("CWD={}", dir.display()), "cwd = worktree");
+        assert_eq!(
+            lines[lines.len() - 1],
+            &format!("CWD={}", dir.display()),
+            "cwd = worktree"
+        );
         std::fs::remove_dir_all(&dir).ok();
     }
 
@@ -327,7 +350,9 @@ mod tests {
         let out = CursorWorker.run("x", &dir).unwrap();
         unsafe { std::env::remove_var("PHEOBE_CURSOR_BIN") };
         assert_eq!(out.final_text, "{\"ok\":true,\"summary\":\"landed\"}");
-        let tail = out.json_tail.expect("report-contract object becomes the tail");
+        let tail = out
+            .json_tail
+            .expect("report-contract object becomes the tail");
         assert_eq!(tail["ok"], true);
         assert_eq!(tail["summary"], "landed");
         std::fs::remove_dir_all(&dir).ok();
@@ -339,8 +364,14 @@ mod tests {
         unsafe { std::env::set_var("PHEOBE_CURSOR_BIN", "/nonexistent/pheobe-fake-cursor") };
         let err = format!("{:#}", CursorWorker.run("x", &dir).unwrap_err());
         unsafe { std::env::remove_var("PHEOBE_CURSOR_BIN") };
-        assert!(err.contains("failed to spawn '/nonexistent/pheobe-fake-cursor'"), "got: {err}");
-        assert!(err.contains("PHEOBE_CURSOR_BIN"), "names the env override, got: {err}");
+        assert!(
+            err.contains("failed to spawn '/nonexistent/pheobe-fake-cursor'"),
+            "got: {err}"
+        );
+        assert!(
+            err.contains("PHEOBE_CURSOR_BIN"),
+            "names the env override, got: {err}"
+        );
         std::fs::remove_dir_all(&dir).ok();
     }
 
@@ -356,7 +387,10 @@ mod tests {
         let err = format!("{:#}", CursorWorker.run("x", &dir).unwrap_err());
         unsafe { std::env::remove_var("PHEOBE_CURSOR_BIN") };
         assert!(err.contains("exited with"), "got: {err}");
-        assert!(err.contains("cursor auth expired"), "stderr tail included, got: {err}");
+        assert!(
+            err.contains("cursor auth expired"),
+            "stderr tail included, got: {err}"
+        );
         std::fs::remove_dir_all(&dir).ok();
     }
 }

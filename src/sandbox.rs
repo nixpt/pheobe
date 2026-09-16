@@ -160,7 +160,9 @@ const ALLOWED_PREFIXES: &[&str] = &[
 /// Check whether a bash command is allowed in the strict tier.
 pub fn strict_allowed(cmd: &str) -> bool {
     let trimmed = cmd.trim_start();
-    ALLOWED_PREFIXES.iter().any(|prefix| trimmed.starts_with(prefix))
+    ALLOWED_PREFIXES
+        .iter()
+        .any(|prefix| trimmed.starts_with(prefix))
 }
 
 /// Wrap a command to run inside the sandbox.  For `strict`/`moderate` this
@@ -245,13 +247,22 @@ mod tests {
         let dir = scratch("args");
         let args = build_bwrap_args("cargo test", &dir, &Tier::Strict);
         assert!(args.contains(&"--unshare-pid".into()), "has PID ns");
-        assert!(args.contains(&"--unshare-net".into()), "strict = no network");
+        assert!(
+            args.contains(&"--unshare-net".into()),
+            "strict = no network"
+        );
         assert!(args.contains(&"--dev".into()), "has pseudo /dev");
         assert!(args.contains(&"--proc".into()), "has pseudo /proc");
         let wt_idx = args.iter().position(|a| a == "--bind").expect("has --bind");
-        assert_eq!(args[wt_idx + 1], dir.display().to_string(), "bind source = worktree");
-        assert!(args.last() == Some(&"sh".into()) || args.contains(&"sh".into()),
-            "the shell command is the final part of the bwrap argv");
+        assert_eq!(
+            args[wt_idx + 1],
+            dir.display().to_string(),
+            "bind source = worktree"
+        );
+        assert!(
+            args.last() == Some(&"sh".into()) || args.contains(&"sh".into()),
+            "the shell command is the final part of the bwrap argv"
+        );
         assert!(args.contains(&"-c".into()), "has sh -c");
         std::fs::remove_dir_all(&dir).ok();
     }
@@ -261,14 +272,19 @@ mod tests {
         let dir = scratch("moderate");
         let args = build_bwrap_args("echo ok", &dir, &Tier::Moderate);
         assert!(args.contains(&"--unshare-pid".into()));
-        assert!(!args.contains(&"--unshare-net".into()), "moderate allows network");
+        assert!(
+            !args.contains(&"--unshare-net".into()),
+            "moderate allows network"
+        );
         std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]
     fn free_tier_returns_none_from_sandboxed_command() {
         let dir = scratch("free");
-        assert!(sandboxed_command("ls", &dir, &Tier::Free).unwrap().is_none());
+        assert!(sandboxed_command("ls", &dir, &Tier::Free)
+            .unwrap()
+            .is_none());
         std::fs::remove_dir_all(&dir).ok();
     }
 
@@ -281,7 +297,10 @@ mod tests {
         let empty = dir.join("empty");
         std::fs::create_dir_all(&empty).unwrap();
         unsafe { std::env::set_var("PATH", empty.display().to_string()) };
-        let err = format!("{:#}", sandboxed_command("ls", &dir, &Tier::Strict).unwrap_err());
+        let err = format!(
+            "{:#}",
+            sandboxed_command("ls", &dir, &Tier::Strict).unwrap_err()
+        );
         assert!(err.contains("bwrap"), "names the missing tool: {err}");
         assert!(err.contains("free"), "tells you the escape hatch: {err}");
         unsafe { std::env::set_var("PATH", &real_path) };
@@ -295,7 +314,9 @@ mod tests {
         let real_path = std::env::var("PATH").unwrap_or_default();
         fake_bin(&dir, "bwrap");
         unsafe { std::env::set_var("PATH", format!("{}:{real_path}", dir.display())) };
-        let mut cmd = sandboxed_command("echo ok", &dir, &Tier::Strict).unwrap().expect("Some");
+        let mut cmd = sandboxed_command("echo ok", &dir, &Tier::Strict)
+            .unwrap()
+            .expect("Some");
         let out = cmd.output().unwrap();
         assert!(out.status.success());
         assert!(
@@ -326,7 +347,10 @@ mod tests {
         let _lock = PATH_LOCK.lock().unwrap();
         let task = crate::task::Task {
             task: "test".into(),
-            done_when: crate::task::DoneWhen::Command { run: "true".into(), expect_exit: 0 },
+            done_when: crate::task::DoneWhen::Command {
+                run: "true".into(),
+                expect_exit: 0,
+            },
             repo: None,
             worktree: true,
             branch: None,

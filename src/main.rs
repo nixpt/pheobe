@@ -142,7 +142,10 @@ fn run_cmd() -> Result<()> {
     let cli = Cli::parse();
     match cli.cmd {
         Cmd::Run { task_file, branch } => cmd_run(&task_file, branch),
-        Cmd::Verify { task_file, worktree } => cmd_verify(&task_file, worktree),
+        Cmd::Verify {
+            task_file,
+            worktree,
+        } => cmd_verify(&task_file, worktree),
         Cmd::Ctx { cmd } => cmd_ctx(cmd),
         Cmd::Learn { cmd } => cmd_learn(cmd),
         Cmd::Adopt { cmd } => cmd_adopt(cmd),
@@ -167,7 +170,9 @@ fn cmd_run(task_file: &str, branch: Option<String>) -> Result<()> {
 
 fn cmd_verify(task_file: &str, worktree: Option<String>) -> Result<()> {
     let task = task::load(task_file)?;
-    let cwd = worktree.map(PathBuf::from).unwrap_or_else(|| std::env::current_dir().unwrap());
+    let cwd = worktree
+        .map(PathBuf::from)
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
     let ev = verify::run_done_when(&task, &cwd)?;
     let (violations, _byproducts) = worktree::check_allowlist(&cwd, &task.paths_allow)?;
     if !ev.passed || !violations.is_empty() {
@@ -214,7 +219,10 @@ fn cmd_adopt(cmd: Option<AdoptCmd>) -> Result<()> {
         Some(AdoptCmd::ClaudeSdk) => print!("{}", include_str!("../adopt/claude/sdk-snippet.md")),
         Some(AdoptCmd::OpencodeSelf) => {
             print!("{}", include_str!("../adopt/opencode/self-agent.md"));
-            print!("{}", include_str!("../adopt/opencode/opencode.jsonc-snippet.md"));
+            print!(
+                "{}",
+                include_str!("../adopt/opencode/opencode.jsonc-snippet.md")
+            );
         }
         Some(AdoptCmd::Opencode) => print!("{}", include_str!("../adopt/opencode/pheobe-host.md")),
         Some(AdoptCmd::Codex) => {
@@ -254,7 +262,10 @@ fn cmd_check(cmd: CheckCmd) -> Result<()> {
         CheckCmd::List => {
             let cps = checkpoint::list(&wt)?;
             if cps.is_empty() {
-                println!("no checkpoints in {}", wt.join(".pheobe").join("checkpoints.json").display());
+                println!(
+                    "no checkpoints in {}",
+                    wt.join(".pheobe").join("checkpoints.json").display()
+                );
                 return Ok(());
             }
             println!("{:<20} {:<12} {:<12} {:<12}", "NAME", "TS", "HEAD", "STASH");
@@ -278,8 +289,16 @@ fn cmd_check(cmd: CheckCmd) -> Result<()> {
 }
 
 fn cmd_doctor() -> Result<()> {
-    let endpoint = std::env::var("PHEOBE_BASE_URL").is_ok() && std::env::var("PHEOBE_MODEL").is_ok();
-    println!("endpoint:     {}", if endpoint { "configured (PHEOBE_BASE_URL + PHEOBE_MODEL)" } else { "NOT configured" });
+    let endpoint =
+        std::env::var("PHEOBE_BASE_URL").is_ok() && std::env::var("PHEOBE_MODEL").is_ok();
+    println!(
+        "endpoint:     {}",
+        if endpoint {
+            "configured (PHEOBE_BASE_URL + PHEOBE_MODEL)"
+        } else {
+            "NOT configured"
+        }
+    );
     for (name, hint) in [
         ("kitchen", "worktree primitive (preferred)"),
         ("buckets", "worktree primitive (fallback)"),
@@ -291,7 +310,15 @@ fn cmd_doctor() -> Result<()> {
             .args(["-c", &format!("command -v {name} >/dev/null 2>&1")])
             .status()
             .is_ok_and(|s| s.success());
-        println!("{:14} {}", format!("{name}:"), if found { hint_ok(hint) } else { "missing".to_string() });
+        println!(
+            "{:14} {}",
+            format!("{name}:"),
+            if found {
+                hint_ok(hint)
+            } else {
+                "missing".to_string()
+            }
+        );
     }
     Ok(())
 }

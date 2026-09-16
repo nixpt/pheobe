@@ -58,10 +58,7 @@ impl Worker for ClaudeWorker {
             .unwrap_or(DEFAULT_TIMEOUT_SECS);
 
         let mut cmd = Command::new(&bin);
-        cmd.arg("-p")
-            .arg(prompt)
-            .arg("--output-format")
-            .arg("json");
+        cmd.arg("-p").arg(prompt).arg("--output-format").arg("json");
         cmd.args(flags.split_whitespace());
         cmd.current_dir(worktree);
         cmd.stdin(Stdio::null());
@@ -77,8 +74,14 @@ impl Worker for ClaudeWorker {
 
         // drain pipes on threads — a piped claude must never block on a full
         // stdout buffer while we poll
-        let mut out_pipe = child.stdout.take().context("claude worker: no stdout pipe")?;
-        let mut err_pipe = child.stderr.take().context("claude worker: no stderr pipe")?;
+        let mut out_pipe = child
+            .stdout
+            .take()
+            .context("claude worker: no stdout pipe")?;
+        let mut err_pipe = child
+            .stderr
+            .take()
+            .context("claude worker: no stderr pipe")?;
         let stdout_reader = std::thread::spawn(move || {
             let mut buf = String::new();
             let _ = out_pipe.read_to_string(&mut buf);
@@ -185,7 +188,11 @@ fn from_result_object(v: &Value) -> (WorkerOutcome, bool) {
     let is_error = v.get("is_error").and_then(|b| b.as_bool()).unwrap_or(false);
     let final_text = v
         .get("result")
-        .map(|r| r.as_str().map(|s| s.to_string()).unwrap_or_else(|| r.to_string()))
+        .map(|r| {
+            r.as_str()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| r.to_string())
+        })
         .unwrap_or_default();
     let tokens = v.get("usage").and_then(sum_usage);
     let usd = v.get("total_cost_usd").and_then(|c| c.as_f64());
@@ -196,7 +203,12 @@ fn from_result_object(v: &Value) -> (WorkerOutcome, bool) {
         .ok()
         .filter(|j| j.is_object());
     (
-        WorkerOutcome { final_text, tokens, usd, json_tail },
+        WorkerOutcome {
+            final_text,
+            tokens,
+            usd,
+            json_tail,
+        },
         is_error,
     )
 }
