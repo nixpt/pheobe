@@ -160,7 +160,13 @@ fn cmd_run(task_file: &str, branch: Option<String>) -> Result<()> {
 
     // orient: knowledge drive brief (repo-local + global drives) + learned nudges
     let entries = knowledge::load_all(Some(&wt))?;
-    let brief = knowledge::brief(&entries);
+    let mut brief = knowledge::brief(&entries);
+    // structural read brief (polydex, fresh index) — empty when absent/stale;
+    // skip-don't-fail, same posture as the knowledge drive
+    let structural = pheobe::structint::orient_brief(&wt);
+    if !structural.is_empty() {
+        brief.push_str(&structural);
+    }
     let nudges = learn::nudges_for(&repo_str);
     if !nudges.is_empty() {
         eprintln!("📚 {} learned nudge(s) for this repo", nudges.len());
