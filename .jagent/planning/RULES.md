@@ -50,3 +50,14 @@ within this crate; the emoe "become a crate" clause applies to workspaces).
 This is the fleet's 1000-line file lesson (razor runtime.rs, cells librarian)
 turned a standing rule. Test code counts — split by section into
 `src/tests/` files when a suite outgrows its file.
+
+## 7. Live coordination goes through `scripts/pheobe-sync`
+
+More than one agent works this repo at a time (foreman, cursor, codex, the
+captain's own sessions). On arrival, `scripts/pheobe-sync read --tail 30`
+alongside the board; `claim` a ticket or file before overlapping edits;
+`post` blockers and results as they happen; `done` at handoff. It wraps
+jokersquad's `agent-sync` — one JSONL channel per primary checkout at
+`.jagent/sync/pheobe.jsonl` (gitignored, shared by that clone's worktrees).
+Protocol: `docs/SYNC.md`. Decisions still go to `.dejavue/`, status to
+`.jagent/planning/` — the channel is the conversation, not the record.

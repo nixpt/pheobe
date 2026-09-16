@@ -1,2 +1,5 @@
 /target
 Cargo.lock
+
+# agent-sync channel (scripts/pheobe-sync) — local coordination, never committed
+.jagent/sync/
