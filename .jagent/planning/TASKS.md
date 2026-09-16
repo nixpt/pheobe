@@ -20,5 +20,6 @@ and are listed here so the board is the one place to look.
 
 ## M1 — adoptable
 
+- [x] PHEOBE-9 — the `Worker` trait + `PHEOBE_PROVIDER` dispatcher (`agent/nixp/PHEOBE-9-worker-trait`)
 - [ ] adoption kits verified against a real harness each
 - [ ] host mode exit gate (`pheobe verify`)

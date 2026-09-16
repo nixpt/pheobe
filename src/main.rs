@@ -4,7 +4,7 @@
 
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
-use pheobe::{agent, knowledge, learn, llm, plan, report, task, verify, worktree};
+use pheobe::{agent, knowledge, learn, llm, plan, report, task, verify, worker, worktree};
 use std::path::{Path, PathBuf};
 
 #[derive(Parser, Debug)]
@@ -140,8 +140,11 @@ fn cmd_run(task_file: &str, branch: Option<String>) -> Result<()> {
     // plan file seeded; the model refines it through the loop
     plan::save(&wt, &plan::Plan { task: task.task.clone(), steps: vec![] })?;
 
-    // the model turn (PHEOBE_BASE_URL / PHEOBE_MODEL / PHEOBE_API_KEY)
-    let provider = llm::OpenAi::from_env()?;
+    // the model turn, dispatched by PHEOBE_PROVIDER (PHEOBE-9):
+    //   openai (default)  → the built-in per-turn Provider loop
+    //   <worker adapter>  → one prompt out, one whole run back (PHEOBE-4..8)
+    // unknown provider → a clear error from the registry, before anything else
+    let provider_name = std::env::var("PHEOBE_PROVIDER").unwrap_or_else(|_| "openai".to_string());
     let ttl = task.ttl.as_deref().map(pheobe::aging::parse_ttl).transpose()?;
     let cfg = agent::LoopCfg {
         max_turns: task.budget.as_ref().map(|b| b.max_iterations * 8).unwrap_or(60),
@@ -149,7 +152,13 @@ fn cmd_run(task_file: &str, branch: Option<String>) -> Result<()> {
         max_usd: task.budget.as_ref().and_then(|b| b.max_usd),
         usd_per_mtok: std::env::var("PHEOBE_USD_PER_MTOK").ok().and_then(|v| v.parse().ok()),
     };
-    let outcome = agent::run(&provider, &task, &wt, &task_id, &brief, &nudges, &cfg)?;
+    let outcome = match worker::worker_from_env(&provider_name)? {
+        Some(w) => agent::run_worker(w.as_ref(), &task, &wt, &task_id, &brief, &nudges, &cfg)?,
+        None => {
+            let provider = llm::OpenAi::from_env()?;
+            agent::run(&provider, &task, &wt, &task_id, &brief, &nudges, &cfg)?
+        }
+    };
 
     // mechanical gates run after the loop and have the final word over the model
     let mut commits = vec![];
