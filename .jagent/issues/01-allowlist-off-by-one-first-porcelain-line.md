@@ -1,6 +1,7 @@
 # Allowlist gate mangles the first `git status --porcelain` line — every real run is blocked
 
 **Found:** 2026-09-16, foreman s456, live run against OpenCode Zen (`deepseek-v4-pro`, `kimi-k2.6`, `glm-5.2` — identical on all three)
+**Status:** Done
 **Severity:** P0 — the exit gate rejects every successful model turn
 **Where:** `src/worktree.rs` — `run()` (~line 25) and `check_allowlist()` (~line 90-108)
 
@@ -32,3 +33,12 @@ Don't trim porcelain output before parsing (add a `run_raw` or parse in `check_a
 
 - pheobe `c828bec` (main), release build
 - rustc 1.9x (workspace toolchain), Linux (CachyOS)
+
+## Resolution
+
+Fixed on `agent/nixp/PHEOBE-3-issues2`: `worktree::status_porcelain()` returns raw
+(untrimmed) porcelain lines; `porcelain_path()` parses `XY<space>path` via `line[3..]`,
+handles rename `old -> new` (takes the new side) and dequotes quoted paths.
+Regression test `issue01_first_porcelain_line_not_mangled` (first entry = single
+edited file → passes the gate; tracked outside edit → caught with full name).
+Re-verified against the scratch repro on the fixed build: `✅ verify passed`.

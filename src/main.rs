@@ -155,14 +155,17 @@ fn cmd_run(task_file: &str, branch: Option<String>) -> Result<()> {
     let mut commits = vec![];
     let dirty = worktree::status_dirty(&wt)?;
     if outcome.ok && dirty {
-        let violations = worktree::check_allowlist(&wt, &task.paths_allow)?;
+        let (violations, byproducts) = worktree::check_allowlist(&wt, &task.paths_allow)?;
+        if !byproducts.is_empty() {
+            eprintln!("📝 bash-run byproducts (uncommitted, staged out): {}", byproducts.join(", "));
+        }
         if !violations.is_empty() {
             let _ = learn::end_session(session.as_ref(), "allowlist_violation", 2);
             let rep = report::HandoffReport::failure(&task.task, &format!("paths outside paths_allow: {}", violations.join(", ")));
             report::emit(&rep)?;
             bail!("run blocked by allowlist violations");
         }
-        let sha = worktree::commit(&wt, &task_id, outcome.summary.as_deref().unwrap_or(&task.task))?;
+        let sha = worktree::commit(&wt, &task_id, outcome.summary.as_deref().unwrap_or(&task.task), &task.paths_allow)?;
         commits.push(sha);
     }
 
@@ -200,7 +203,7 @@ fn cmd_verify(task_file: &str, worktree: Option<String>) -> Result<()> {
     let task = task::load(task_file)?;
     let cwd = worktree.map(PathBuf::from).unwrap_or_else(|| std::env::current_dir().unwrap());
     let ev = verify::run_done_when(&task, &cwd)?;
-    let violations = worktree::check_allowlist(&cwd, &task.paths_allow)?;
+    let (violations, _byproducts) = worktree::check_allowlist(&cwd, &task.paths_allow)?;
     if !ev.passed || !violations.is_empty() {
         for v in violations {
             eprintln!("  ✋ outside paths_allow: {v}");

@@ -86,6 +86,10 @@ fn provision_buckets(repo: &Path, branch: &str) -> Result<(PathBuf, String)> {
 /// whole output eats the leading space of the first line, and `line[3..]`
 /// then yields `alc.py` for ` M calc.py`. Every real run's first status
 /// entry is the edited file, so this exact mangling blocked the exit gate.
+pub fn status_dirty(wt: &Path) -> Result<bool> {
+    Ok(!status_porcelain(wt)?.is_empty())
+}
+
 pub fn status_porcelain(wt: &Path) -> Result<Vec<String>> {
     let out = Command::new("git").arg("-C").arg(wt).args(["status", "--porcelain"]).output()?;
     if !out.status.success() {

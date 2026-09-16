@@ -173,7 +173,7 @@ fn loop_writes_inside_allowlist_commits_and_hands_off() {
     let ev = crate::verify::run_done_when(&task, &wt).unwrap();
     assert!(ev.passed);
 
-    let sha = crate::worktree::commit(&wt, "t1", "add src/x.rs").unwrap();
+    let sha = crate::worktree::commit(&wt, "t1", "add src/x.rs", &["src/".to_string()]).unwrap();
     assert!(!sha.is_empty());
     let msg = run_git(&wt, &["log", "-1", "--format=%B"]);
     assert!(msg.contains("Pheobe-Task: t1"), "commit trailer missing: {msg}");
@@ -282,4 +282,85 @@ fn loop_stops_on_usd_budget() {
     assert!(blocked.contains("budget_exceeded"), "got: {blocked}");
     assert!(out.usage.turns <= 25, "budget must cut the run early, got {} turns", out.usage.turns);
     std::fs::remove_dir_all(&root).ok();
+}
+
+// ── .jagent/issues regression tests (verified live on Zen, s456) ────────────
+
+fn git_repo_with(name: &str, content: &str) -> std::path::PathBuf {
+    use std::sync::atomic::{AtomicU32, Ordering};
+    static SEQ: AtomicU32 = AtomicU32::new(0);
+    let n = SEQ.fetch_add(1, Ordering::SeqCst);
+    let root = std::env::temp_dir().join(format!("pheobe-{}-{}-{}", name, std::process::id(), n));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    crate::tests::run_git(&root, &["init", "-q"]);
+    crate::tests::run_git(&root, &["config", "user.email", "t@t"]);
+    crate::tests::run_git(&root, &["config", "user.name", "t"]);
+    std::fs::write(root.join(name), content).unwrap();
+    crate::tests::run_git(&root, &["add", "."]);
+    crate::tests::run_git(&root, &["commit", "-q", "-m", "init"]);
+    root
+}
+
+/// Issue 01: single modified file as the FIRST porcelain line — ` M calc.py`
+/// must parse to `calc.py`, not `alc.py`.
+#[test]
+fn issue01_first_porcelain_line_not_mangled() {
+    let root = git_repo_with("calc.py", "def add(a,b):\n    return a-b\n");
+    std::fs::write(root.join("calc.py"), "def add(a,b):\n    return a+b\n").unwrap();
+
+    let (violations, _by) = crate::worktree::check_allowlist(&root, &["calc.py".to_string()]).unwrap();
+    assert!(violations.is_empty(), "edited allowlisted file must pass, got: {violations:?}");
+
+    // a genuinely outside edit (tracked file, e.g. via bash sed) is caught
+    // with its FULL name; untracked junk would be a byproduct instead
+    let other = git_repo_with("calc.py", "x");
+    std::fs::write(other.join("other.py"), "z").unwrap();
+    crate::tests::run_git(&other, &["add", "."]);
+    crate::tests::run_git(&other, &["commit", "-q", "-m", "add other"]);
+    std::fs::write(other.join("other.py"), "w").unwrap();
+    let (violations, _) = crate::worktree::check_allowlist(&other, &["calc.py".to_string()]).unwrap();
+    assert_eq!(violations, vec!["other.py".to_string()]);
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// Issue 02: pheobe's own state dir is never a violation; bash-run byproducts
+/// are reported separately and staged OUT of the commit.
+#[test]
+fn issue02_state_dir_exempt_and_byproducts_staged_out() {
+    let root = git_repo_with("calc.py", "def add(a,b):\n    return a-b\n");
+    std::fs::write(root.join("calc.py"), "def add(a,b):\n    return a+b\n").unwrap();
+    std::fs::create_dir_all(root.join(".pheobe")).unwrap();
+    std::fs::write(root.join(".pheobe/plan.json"), "{}").unwrap();
+    std::fs::create_dir_all(root.join("__pycache__")).unwrap();
+    std::fs::write(root.join("__pycache__/junk.py"), "x").unwrap();
+
+    let (violations, byproducts) = crate::worktree::check_allowlist(&root, &["calc.py".to_string()]).unwrap();
+    assert!(violations.is_empty(), ".pheobe must be exempt, got: {violations:?}");
+    assert_eq!(byproducts, vec!["__pycache__/".to_string()]);
+
+    // commit stages ONLY the allowlisted file — the byproduct stays out
+    let sha = crate::worktree::commit(&root, "t", "fix add", &["calc.py".to_string()]).unwrap();
+    assert!(!sha.is_empty());
+    let committed = crate::tests::run_git(&root, &["show", "--name-only", "--format=", "HEAD"]);
+    assert!(committed.contains("calc.py"), "got: {committed}");
+    assert!(!committed.contains("__pycache__"), "byproduct staged in: {committed}");
+    assert!(!committed.contains(".pheobe"), "state staged in: {committed}");
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// Issue 03: an existing `pheobe/<slug>` branch never gets silently reused.
+#[test]
+fn issue03_existing_branch_suffixed_not_reused() {
+    let root = git_repo_with("f.txt", "a\n");
+    crate::tests::run_git(&root, &["branch", "pheobe/demo"]);
+    let b = crate::worktree::next_free_branch(&root, "pheobe/demo").unwrap();
+    assert_eq!(b, "pheobe/demo-2");
+    crate::tests::run_git(&root, &["branch", "pheobe/demo-2"]);
+    let b2 = crate::worktree::next_free_branch(&root, "pheobe/demo").unwrap();
+    assert_eq!(b2, "pheobe/demo-3");
+    // free base comes back untouched
+    let b3 = crate::worktree::next_free_branch(&root, "pheobe/fresh").unwrap();
+    assert_eq!(b3, "pheobe/fresh");
+    let _ = std::fs::remove_dir_all(&root);
 }
