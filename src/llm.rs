@@ -23,16 +23,36 @@ pub struct Msg {
 
 impl Msg {
     pub fn system(content: impl Into<String>) -> Self {
-        Msg { role: "system".into(), content: Some(content.into()), tool_calls: vec![], tool_call_id: None }
+        Msg {
+            role: "system".into(),
+            content: Some(content.into()),
+            tool_calls: vec![],
+            tool_call_id: None,
+        }
     }
     pub fn user(content: impl Into<String>) -> Self {
-        Msg { role: "user".into(), content: Some(content.into()), tool_calls: vec![], tool_call_id: None }
+        Msg {
+            role: "user".into(),
+            content: Some(content.into()),
+            tool_calls: vec![],
+            tool_call_id: None,
+        }
     }
     pub fn tool_result(id: &str, content: impl Into<String>) -> Self {
-        Msg { role: "tool".into(), content: Some(content.into()), tool_calls: vec![], tool_call_id: Some(id.to_string()) }
+        Msg {
+            role: "tool".into(),
+            content: Some(content.into()),
+            tool_calls: vec![],
+            tool_call_id: Some(id.to_string()),
+        }
     }
     pub fn assistant(content: impl Into<String>, tool_calls: Vec<ToolCall>) -> Self {
-        Msg { role: "assistant".into(), content: Some(content.into()), tool_calls, tool_call_id: None }
+        Msg {
+            role: "assistant".into(),
+            content: Some(content.into()),
+            tool_calls,
+            tool_call_id: None,
+        }
     }
 }
 
@@ -65,7 +85,14 @@ struct ToolSchemaFn {
 
 impl ToolSchema {
     pub fn new(name: &str, description: &str, parameters: Value) -> Self {
-        ToolSchema { kind: "function".into(), function: ToolSchemaFn { name: name.into(), description: description.into(), parameters } }
+        ToolSchema {
+            kind: "function".into(),
+            function: ToolSchemaFn {
+                name: name.into(),
+                description: description.into(),
+                parameters,
+            },
+        }
     }
     pub fn name(&self) -> &str {
         &self.function.name
@@ -98,7 +125,11 @@ impl OpenAi {
         let model = std::env::var("PHEOBE_MODEL")
             .context("PHEOBE_MODEL not set — name the model pheobe should run")?;
         let api_key = std::env::var("PHEOBE_API_KEY").unwrap_or_default();
-        Ok(OpenAi { base_url: base_url.trim_end_matches('/').to_string(), api_key, model })
+        Ok(OpenAi {
+            base_url: base_url.trim_end_matches('/').to_string(),
+            api_key,
+            model,
+        })
     }
 }
 
@@ -136,9 +167,7 @@ impl Provider for OpenAi {
             .context("endpoint response had no choices[0].message")?
             .clone();
         let msg: Msg = serde_json::from_value(choice)?;
-        let total = v
-            .pointer("/usage/total_tokens")
-            .and_then(|t| t.as_u64());
+        let total = v.pointer("/usage/total_tokens").and_then(|t| t.as_u64());
         Ok((msg, total))
     }
 }

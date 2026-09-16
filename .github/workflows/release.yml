@@ -32,6 +32,18 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       - uses: dtolnay/rust-toolchain@stable
         if: hashFiles('Cargo.toml') != ''
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+
+      # Never tag a red tree: the same gate ci.yml runs, in-line, so a bump
+      # cannot outrun a failing check on a direct push to main.
+      - name: gate (fmt + clippy + test)
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets -- -D warnings
+          cargo test
+
       - name: bump + tag + push
         env:
           BUMPVER_MAIN_BRANCH: main

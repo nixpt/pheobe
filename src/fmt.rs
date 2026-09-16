@@ -31,9 +31,12 @@ pub fn formatter_for(wt: &Path, path: &Path) -> Option<(&'static str, Vec<String
                 .iter()
                 .map(|a| match *a {
                     "$FILE" => path.display().to_string(),
-                    "prettier" if *name == "prettier" => {
-                        wt.join("node_modules").join(".bin").join("prettier").display().to_string()
-                    }
+                    "prettier" if *name == "prettier" => wt
+                        .join("node_modules")
+                        .join(".bin")
+                        .join("prettier")
+                        .display()
+                        .to_string(),
                     _ => (*a).to_string(),
                 })
                 .collect();
@@ -57,7 +60,11 @@ pub fn format_on_write(wt: &Path, path: &Path) -> Option<String> {
         return None;
     }
     let (name, argv) = formatter_for(wt, path)?;
-    let out = match Command::new(&argv[0]).args(&argv[1..]).current_dir(wt).output() {
+    let out = match Command::new(&argv[0])
+        .args(&argv[1..])
+        .current_dir(wt)
+        .output()
+    {
         Err(_) => return None, // ENOENT — formatter not installed, silent skip
         Ok(o) => o,
     };
@@ -86,14 +93,24 @@ mod tests {
 
         let (n, argv) = formatter_for(wt, Path::new("pkg/app.go")).unwrap();
         assert_eq!(n, "gofmt");
-        assert_eq!(argv, vec!["gofmt".to_string(), "-w".to_string(), "pkg/app.go".to_string()]);
+        assert_eq!(
+            argv,
+            vec![
+                "gofmt".to_string(),
+                "-w".to_string(),
+                "pkg/app.go".to_string()
+            ]
+        );
 
         let (n, _) = formatter_for(wt, Path::new("m/x.py")).unwrap();
         assert_eq!(n, "black");
 
         let (n, argv) = formatter_for(wt, Path::new("web/app.ts")).unwrap();
         assert_eq!(n, "prettier");
-        assert!(argv[0].ends_with("node_modules/.bin/prettier"), "got: {argv:?}");
+        assert!(
+            argv[0].ends_with("node_modules/.bin/prettier"),
+            "got: {argv:?}"
+        );
 
         assert!(formatter_for(wt, Path::new("data.bin")).is_none());
         assert!(formatter_for(wt, Path::new("noext")).is_none());
@@ -133,7 +150,10 @@ mod tests {
             std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
         }
         let note = format_on_write(&dir, Path::new("web/app.js")).unwrap();
-        assert!(note.contains("doubt") && note.contains("prettier") && note.contains("boom"), "got: {note}");
+        assert!(
+            note.contains("doubt") && note.contains("prettier") && note.contains("boom"),
+            "got: {note}"
+        );
 
         std::fs::remove_dir_all(&dir).ok();
     }

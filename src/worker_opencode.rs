@@ -58,7 +58,12 @@ impl OpenCodeWorker {
             .ok()
             .and_then(|s| s.trim().parse::<u64>().ok())
             .unwrap_or(DEFAULT_TIMEOUT_SECS);
-        Ok(Self { bin, model, attach, timeout: Duration::from_secs(timeout_secs) })
+        Ok(Self {
+            bin,
+            model,
+            attach,
+            timeout: Duration::from_secs(timeout_secs),
+        })
     }
 }
 
@@ -69,8 +74,12 @@ pub fn worker() -> Result<Arc<dyn Worker>> {
 
 impl Worker for OpenCodeWorker {
     fn run(&self, prompt: &str, worktree: &Path) -> Result<WorkerOutcome> {
-        let mut args: Vec<String> =
-            vec!["run".into(), "--format".into(), "json".into(), "--auto".into()];
+        let mut args: Vec<String> = vec![
+            "run".into(),
+            "--format".into(),
+            "json".into(),
+            "--auto".into(),
+        ];
         if let Some(m) = &self.model {
             args.extend(["-m".into(), m.clone()]);
         }
@@ -96,9 +105,8 @@ impl Worker for OpenCodeWorker {
                 self.bin
             ),
             Err(e) => {
-                return Err(e).with_context(|| {
-                    format!("opencode worker: failed to spawn '{}'", self.bin)
-                })
+                return Err(e)
+                    .with_context(|| format!("opencode worker: failed to spawn '{}'", self.bin))
             }
         };
 
@@ -106,8 +114,14 @@ impl Worker for OpenCodeWorker {
         // timeout loop; each reader finishes at EOF (exit or kill).
         let out_buf = Arc::new(std::sync::Mutex::new(String::new()));
         let err_buf = Arc::new(std::sync::Mutex::new(String::new()));
-        let out_reader = spawn_drain(child.stdout.take().expect("stdout piped"), Arc::clone(&out_buf));
-        let err_reader = spawn_drain(child.stderr.take().expect("stderr piped"), Arc::clone(&err_buf));
+        let out_reader = spawn_drain(
+            child.stdout.take().expect("stdout piped"),
+            Arc::clone(&out_buf),
+        );
+        let err_reader = spawn_drain(
+            child.stderr.take().expect("stderr piped"),
+            Arc::clone(&err_buf),
+        );
 
         let started = Instant::now();
         let status = loop {
@@ -138,7 +152,14 @@ impl Worker for OpenCodeWorker {
             if let Some(e) = stream_error {
                 why.push_str(&format!("; engine reported: {e}"));
             }
-            let tail: String = stderr.lines().rev().take(5).collect::<Vec<_>>().into_iter().rev().collect();
+            let tail: String = stderr
+                .lines()
+                .rev()
+                .take(5)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect();
             if !tail.trim().is_empty() {
                 why.push_str(&format!("; stderr: {tail}"));
             }
@@ -146,12 +167,20 @@ impl Worker for OpenCodeWorker {
         }
 
         let json_tail = extract_json_tail(&final_text);
-        Ok(WorkerOutcome { final_text, tokens, usd, json_tail })
+        Ok(WorkerOutcome {
+            final_text,
+            tokens,
+            usd,
+            json_tail,
+        })
     }
 }
 
 /// Move a pipe onto a thread that reads until EOF into the shared buffer.
-fn spawn_drain(mut pipe: impl Read + Send + 'static, buf: Arc<std::sync::Mutex<String>>) -> std::thread::JoinHandle<()> {
+fn spawn_drain(
+    mut pipe: impl Read + Send + 'static,
+    buf: Arc<std::sync::Mutex<String>>,
+) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
         let mut s = String::new();
         let _ = pipe.read_to_string(&mut s);
@@ -176,7 +205,9 @@ fn parse_stream(raw: &str) -> (String, Option<u64>, Option<f64>, Option<String>)
             continue;
         }
         // non-JSON noise (banners, warnings) is ignored, not fatal
-        let Ok(ev) = serde_json::from_str::<Value>(line) else { continue };
+        let Ok(ev) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
         let ev_type = ev.get("type").and_then(|t| t.as_str());
         if ev_type == Some("error") {
             let e = &ev["error"];
@@ -206,10 +237,12 @@ fn parse_stream(raw: &str) -> (String, Option<u64>, Option<f64>, Option<String>)
                     let sum = tk.get("input").and_then(|v| v.as_u64()).unwrap_or(0)
                         + tk.get("output").and_then(|v| v.as_u64()).unwrap_or(0)
                         + tk.get("reasoning").and_then(|v| v.as_u64()).unwrap_or(0)
-                        + tk.get("cache").map(|c| {
-                            c.get("read").and_then(|v| v.as_u64()).unwrap_or(0)
-                                + c.get("write").and_then(|v| v.as_u64()).unwrap_or(0)
-                        }).unwrap_or(0);
+                        + tk.get("cache")
+                            .map(|c| {
+                                c.get("read").and_then(|v| v.as_u64()).unwrap_or(0)
+                                    + c.get("write").and_then(|v| v.as_u64()).unwrap_or(0)
+                            })
+                            .unwrap_or(0);
                     tokens += sum;
                     saw_tokens = true;
                 }

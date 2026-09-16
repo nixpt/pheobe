@@ -72,7 +72,9 @@ fn destructive_guard(cmd: &str) -> Option<&'static str> {
         ("chmod -R 777 /", "chmod -R 777 /"),
     ];
     let lower = cmd.to_lowercase();
-    DENY.iter().find(|(p, _)| lower.contains(p)).map(|(_, why)| *why)
+    DENY.iter()
+        .find(|(p, _)| lower.contains(p))
+        .map(|(_, why)| *why)
 }
 
 pub fn run_bash(cmd: &str, cwd: &Path, timeout_note: &str) -> Result<String> {
@@ -122,17 +124,26 @@ pub fn run_bash_tiered(
                 String::from_utf8_lossy(&out.stderr)
             );
             let code = out.status.code().unwrap_or(-1);
-            Ok(format!("[sandbox exit {code}]\n{}", truncate(combined.trim_end(), 8000)))
+            Ok(format!(
+                "[sandbox exit {code}]\n{}",
+                truncate(combined.trim_end(), 8000)
+            ))
         }
         None => {
-            let out = Command::new("sh").args(["-c", cmd]).current_dir(cwd).output()?;
+            let out = Command::new("sh")
+                .args(["-c", cmd])
+                .current_dir(cwd)
+                .output()?;
             let combined = format!(
                 "{}{}",
                 String::from_utf8_lossy(&out.stdout),
                 String::from_utf8_lossy(&out.stderr)
             );
             let code = out.status.code().unwrap_or(-1);
-            Ok(format!("[exit {code}]\n{}", truncate(combined.trim_end(), 8000)))
+            Ok(format!(
+                "[exit {code}]\n{}",
+                truncate(combined.trim_end(), 8000)
+            ))
         }
     }
 }
@@ -143,7 +154,10 @@ fn resolve(ctx: &ToolCtx<'_>, path: &str) -> Result<PathBuf> {
     let p = Path::new(path);
     if p.is_absolute() {
         // root jail: absolute paths must sit inside the worktree
-        let wt = ctx.wt.canonicalize().unwrap_or_else(|_| ctx.wt.to_path_buf());
+        let wt = ctx
+            .wt
+            .canonicalize()
+            .unwrap_or_else(|_| ctx.wt.to_path_buf());
         let p = p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
         if !p.starts_with(&wt) {
             bail!("path escapes the worktree root: {path}");
@@ -187,7 +201,11 @@ fn write_tool(_ctx: &ToolCtx<'_>) -> Tool {
             }
             std::fs::write(&p, a["content"].as_str().context("content required")?)?;
             let note = crate::fmt::format_on_write(c.wt, &p).unwrap_or_default();
-            Ok(format!("wrote {} ({} bytes){note}", p.display(), a["content"].as_str().unwrap_or("").len()))
+            Ok(format!(
+                "wrote {} ({} bytes){note}",
+                p.display(),
+                a["content"].as_str().unwrap_or("").len()
+            ))
         }),
     }
 }
@@ -247,7 +265,9 @@ fn walk(dir: &Path, depth: usize, f: &mut dyn FnMut(&Path) -> bool) -> bool {
     if depth > 12 {
         return true;
     }
-    let Ok(rd) = std::fs::read_dir(dir) else { return true };
+    let Ok(rd) = std::fs::read_dir(dir) else {
+        return true;
+    };
     let mut entries: Vec<_> = rd.flatten().collect();
     entries.sort_by_key(|e| e.file_name());
     for e in entries {
@@ -275,7 +295,10 @@ fn grep_tool(_ctx: &ToolCtx<'_>) -> Tool {
             json!({"type":"object","properties":{"pattern":{"type":"string"},"path":{"type":"string","description":"subdir to search (default whole worktree)"}},"required":["pattern"]}),
         ),
         handler: Box::new(move |c, a| {
-            let pat = a["pattern"].as_str().context("pattern required")?.to_lowercase();
+            let pat = a["pattern"]
+                .as_str()
+                .context("pattern required")?
+                .to_lowercase();
             let root = match a["path"].as_str() {
                 Some(p) => resolve(c, p)?,
                 None => c.wt.to_path_buf(),
@@ -286,10 +309,29 @@ fn grep_tool(_ctx: &ToolCtx<'_>) -> Tool {
                     return false;
                 }
                 if let Ok(txt) = std::fs::read_to_string(p) {
-                    if p.extension().map(|e| e == "rs" || e == "md" || e == "toml" || e == "json" || e == "py" || e == "ts" || e == "js" || e == "go" || e == "c" || e == "h").unwrap_or(false) {
+                    if p.extension()
+                        .map(|e| {
+                            e == "rs"
+                                || e == "md"
+                                || e == "toml"
+                                || e == "json"
+                                || e == "py"
+                                || e == "ts"
+                                || e == "js"
+                                || e == "go"
+                                || e == "c"
+                                || e == "h"
+                        })
+                        .unwrap_or(false)
+                    {
                         for (i, line) in txt.lines().enumerate() {
                             if line.to_lowercase().contains(&pat) {
-                                out.push(format!("{}:{}: {}", p.strip_prefix(c.wt).unwrap_or(p).display(), i + 1, truncate(line.trim(), 160)));
+                                out.push(format!(
+                                    "{}:{}: {}",
+                                    p.strip_prefix(c.wt).unwrap_or(p).display(),
+                                    i + 1,
+                                    truncate(line.trim(), 160)
+                                ));
                                 break; // one hit per file keeps the tool result small
                             }
                         }
@@ -297,7 +339,11 @@ fn grep_tool(_ctx: &ToolCtx<'_>) -> Tool {
                 }
                 out.len() < 80
             });
-            Ok(if out.is_empty() { "no matches".into() } else { out.join("\n") })
+            Ok(if out.is_empty() {
+                "no matches".into()
+            } else {
+                out.join("\n")
+            })
         }),
     }
 }
@@ -346,7 +392,10 @@ fn checkpoint_step_boundaries(ctx: &ToolCtx<'_>, new: &plan::Plan, old: Option<&
         if s.status != "done" {
             continue;
         }
-        let was_done = old.and_then(|o| o.steps.get(i)).map(|ps| ps.status == "done").unwrap_or(false);
+        let was_done = old
+            .and_then(|o| o.steps.get(i))
+            .map(|ps| ps.status == "done")
+            .unwrap_or(false);
         if !was_done {
             let _ = crate::checkpoint::create(ctx.wt, &format!("step-{i}"));
         }
@@ -498,12 +547,10 @@ fn sym_tool(
     let owned_name = name.to_string();
     Tool {
         schema: ToolSchema::new(name, description, parameters),
-        handler: Box::new(move |c, a| {
-            match run(c, a) {
-                Ok(Some(text)) => Ok(text),
-                Ok(None) => bail!("{owned_name}: backend unavailable — use the text-tool fallback"),
-                Err(e) => Err(e),
-            }
+        handler: Box::new(move |c, a| match run(c, a) {
+            Ok(Some(text)) => Ok(text),
+            Ok(None) => bail!("{owned_name}: backend unavailable — use the text-tool fallback"),
+            Err(e) => Err(e),
         }),
     }
 }

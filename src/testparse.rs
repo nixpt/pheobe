@@ -53,7 +53,11 @@ fn push_failure_dedupe(failures: &mut Vec<Failure>, file: &str, name: &str, text
     if name.is_empty() || failures.iter().any(|f| f.name == name) {
         return;
     }
-    failures.push(Failure { file: file.to_string(), name, text });
+    failures.push(Failure {
+        file: file.to_string(),
+        name,
+        text,
+    });
 }
 
 // ── cargo test ───────────────────────────────────────────────────────────────
@@ -62,8 +66,8 @@ fn parse_cargo(text: &str) -> Option<TestReport> {
     // "test result: ok. 42 passed; 0 failed; 0 ignored; ..."
     // "test result: FAILED. 10 passed; 1 failed; ..."
     let line = text.lines().find(|l| l.contains("test result:"))?;
-    let passed = count_in(&line, "passed")?;
-    let failed = count_in(&line, "failed").unwrap_or(0);
+    let passed = count_in(line, "passed")?;
+    let failed = count_in(line, "failed").unwrap_or(0);
     let total = passed + failed;
 
     let mut failures: Vec<Failure> = Vec::new();
@@ -89,7 +93,9 @@ fn parse_cargo(text: &str) -> Option<TestReport> {
             if let Some(name) = l.strip_prefix("    ") {
                 let name = name.trim();
                 if !name.is_empty()
-                    && name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | ':' | '.'))
+                    && name
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | ':' | '.'))
                 {
                     push_failure_dedupe(&mut failures, "", name, format!("test failed: {name}"));
                 }
@@ -101,30 +107,46 @@ fn parse_cargo(text: &str) -> Option<TestReport> {
     // panic file refs: "thread 'x' panicked at src/foo.rs:42:" — assign to
     // failures still missing a file, in order
     for l in text.lines() {
-        let Some(idx) = l.find("panicked at ") else { continue };
+        let Some(idx) = l.find("panicked at ") else {
+            continue;
+        };
         let rest = &l[idx + "panicked at ".len()..];
-        let Some((f, _)) = rest.split_once(':') else { continue };
+        let Some((f, _)) = rest.split_once(':') else {
+            continue;
+        };
         if !f.ends_with(".rs") {
             continue;
         }
         if let Some(fail) = failures.iter_mut().find(|f| f.file.is_empty()) {
             fail.file = f.to_string();
         } else {
-            failures.push(Failure { file: f.to_string(), name: "panic".into(), text: "test panicked".into() });
+            failures.push(Failure {
+                file: f.to_string(),
+                name: "panic".into(),
+                text: "test panicked".into(),
+            });
         }
     }
 
-    Some(TestReport { runner: "cargo".into(), total, passed, failed, failures })
+    Some(TestReport {
+        runner: "cargo".into(),
+        total,
+        passed,
+        failed,
+        failures,
+    })
 }
 
 // ── jest / npm ───────────────────────────────────────────────────────────────
 
 fn parse_jest(text: &str) -> Option<TestReport> {
     // "Tests:       2 failed, 14 passed, 16 total"
-    let line = text.lines().find(|l| l.trim_start().starts_with("Tests:"))?;
-    let passed = count_in(&line, "passed").unwrap_or(0);
-    let failed = count_in(&line, "failed").unwrap_or(0);
-    let total = count_in(&line, "total").unwrap_or(passed + failed);
+    let line = text
+        .lines()
+        .find(|l| l.trim_start().starts_with("Tests:"))?;
+    let passed = count_in(line, "passed").unwrap_or(0);
+    let failed = count_in(line, "failed").unwrap_or(0);
+    let total = count_in(line, "total").unwrap_or(passed + failed);
 
     let mut failures: Vec<Failure> = Vec::new();
     for l in text.lines() {
@@ -135,7 +157,13 @@ fn parse_jest(text: &str) -> Option<TestReport> {
             }
         }
     }
-    Some(TestReport { runner: "jest".into(), total, passed, failed, failures })
+    Some(TestReport {
+        runner: "jest".into(),
+        total,
+        passed,
+        failed,
+        failures,
+    })
 }
 
 // ── pytest ───────────────────────────────────────────────────────────────────
@@ -147,17 +175,21 @@ fn parse_pytest(text: &str) -> Option<TestReport> {
     // one carrying one of the count words plus the trailing " in X.Ys".
     let line = text.lines().rev().find(|l| {
         l.contains(" in ")
-            && ["passed", "failed", "error", "skipped"].iter().any(|w| count_in(l, w).is_some())
+            && ["passed", "failed", "error", "skipped"]
+                .iter()
+                .any(|w| count_in(l, w).is_some())
     })?;
-    let passed = count_in(&line, "passed").unwrap_or(0);
-    let failed = count_in(&line, "failed").unwrap_or(0);
-    let errors = count_in(&line, "error").unwrap_or(0);
-    let skipped = count_in(&line, "skipped").unwrap_or(0);
+    let passed = count_in(line, "passed").unwrap_or(0);
+    let failed = count_in(line, "failed").unwrap_or(0);
+    let errors = count_in(line, "error").unwrap_or(0);
+    let skipped = count_in(line, "skipped").unwrap_or(0);
     let total = passed + failed + errors + skipped;
 
     let mut failures: Vec<Failure> = Vec::new();
     for l in text.lines() {
-        let Some(rest) = l.trim_start().strip_prefix("FAILED ") else { continue };
+        let Some(rest) = l.trim_start().strip_prefix("FAILED ") else {
+            continue;
+        };
         let (ref_, _msg) = match rest.split_once(" - ") {
             Some((r, m)) => (r, m),
             None => (rest.trim(), ""),
@@ -168,7 +200,13 @@ fn parse_pytest(text: &str) -> Option<TestReport> {
         };
         push_failure_dedupe(&mut failures, &file, &name, format!("test failed: {ref_}"));
     }
-    Some(TestReport { runner: "pytest".into(), total, passed, failed, failures })
+    Some(TestReport {
+        runner: "pytest".into(),
+        total,
+        passed,
+        failed,
+        failures,
+    })
 }
 
 // ── go test ──────────────────────────────────────────────────────────────────
@@ -176,7 +214,10 @@ fn parse_pytest(text: &str) -> Option<TestReport> {
 /// "    calc_test.go:12: expected 3" → "calc_test.go:12"
 fn go_file_ref(line: &str) -> Option<String> {
     let idx = line.find("_test.go:")?;
-    let start = line[..idx].rfind(char::is_whitespace).map(|p| p + 1).unwrap_or(0);
+    let start = line[..idx]
+        .rfind(char::is_whitespace)
+        .map(|p| p + 1)
+        .unwrap_or(0);
     let rest = &line[start..];
     let mut it = rest.split(':');
     let f = it.next()?;
@@ -199,10 +240,10 @@ fn parse_go(text: &str) -> Option<TestReport> {
             saw_marker = true;
             passed += 1;
             last_marker = i;
-        } else if t.starts_with("--- FAIL: ") {
+        } else if let Some(rest) = t.strip_prefix("--- FAIL: ") {
             saw_marker = true;
             failed += 1;
-            let name = t["--- FAIL: ".len()..].split_whitespace().next().unwrap_or("").to_string();
+            let name = rest.split_whitespace().next().unwrap_or("").to_string();
             // log lines (with the file ref) precede the FAIL marker — search
             // back to the previous marker
             let file = lines[last_marker..i]
@@ -221,7 +262,12 @@ fn parse_go(text: &str) -> Option<TestReport> {
             let t = l.trim_start();
             if t.starts_with("FAIL") {
                 failed += 1;
-                push_failure_dedupe(&mut failures, "", t.trim(), format!("package failed: {}", t.trim()));
+                push_failure_dedupe(
+                    &mut failures,
+                    "",
+                    t.trim(),
+                    format!("package failed: {}", t.trim()),
+                );
             } else if t.starts_with("ok ") || t.starts_with("ok\t") {
                 passed += 1;
             }
@@ -231,7 +277,13 @@ fn parse_go(text: &str) -> Option<TestReport> {
         }
     }
 
-    Some(TestReport { runner: "go".into(), total: passed + failed, passed, failed, failures })
+    Some(TestReport {
+        runner: "go".into(),
+        total: passed + failed,
+        passed,
+        failed,
+        failures,
+    })
 }
 
 #[cfg(test)]
@@ -256,7 +308,10 @@ mod tests {
         assert_eq!(r.passed, 10);
         assert_eq!(r.failed, 1);
         assert_eq!(r.total, 11);
-        assert!(r.failures.iter().any(|f| f.name.contains("tools::write_bad")));
+        assert!(r
+            .failures
+            .iter()
+            .any(|f| f.name.contains("tools::write_bad")));
         assert!(r.failures.iter().any(|f| f.file.contains("src/tools.rs")));
     }
 
@@ -280,7 +335,10 @@ mod tests {
         assert_eq!(r.passed, 1);
         assert_eq!(r.failed, 2);
         assert_eq!(r.total, 3);
-        assert!(r.failures.iter().any(|f| f.name == "test_sub" && f.file == "test_mod.py"));
+        assert!(r
+            .failures
+            .iter()
+            .any(|f| f.name == "test_sub" && f.file == "test_mod.py"));
     }
 
     #[test]

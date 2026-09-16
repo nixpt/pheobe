@@ -9,7 +9,10 @@
 use anyhow::{bail, Result};
 use std::path::Path;
 
-use crate::{agent, aging, knowledge, learn, llm, plan, report, sandbox, structint, task, verify, worker, worktree};
+use crate::{
+    agent, aging, knowledge, learn, llm, plan, report, sandbox, structint, task, verify, worker,
+    worktree,
+};
 
 /// Run the full pipeline for a parsed task and return the handoff report.
 /// `branch` overrides the task's branch (and the auto-derived default).
@@ -29,7 +32,10 @@ pub fn run_task(
     let sandbox_tier = sandbox::Tier::from_name(&sandbox_tier_name)?;
     sandbox::ensure_at_intake(&sandbox_tier)?;
     let repo = task.resolve_repo()?;
-    let branch = branch.map(|b| b.to_string()).or(task.branch.clone()).unwrap_or_else(|| format!("pheobe/{}", task_slug(&task.task)));
+    let branch = branch
+        .map(|b| b.to_string())
+        .or(task.branch.clone())
+        .unwrap_or_else(|| format!("pheobe/{}", task_slug(&task.task)));
     let task_id = task_slug(&task.task);
 
     if !task.worktree && Path::new(&repo).join(".git").is_dir() {
@@ -59,11 +65,20 @@ pub fn run_task(
     }
     let nudges = learn::nudges_for(&repo_str);
     if !nudges.is_empty() {
-        progress(&format!("📚 {} learned nudge(s) for this repo", nudges.len()));
+        progress(&format!(
+            "📚 {} learned nudge(s) for this repo",
+            nudges.len()
+        ));
     }
 
     // plan file seeded; the model refines it through the loop
-    plan::save(&wt, &plan::Plan { task: task.task.clone(), steps: vec![] })?;
+    plan::save(
+        &wt,
+        &plan::Plan {
+            task: task.task.clone(),
+            steps: vec![],
+        },
+    )?;
 
     // the model turn, dispatched by PHEOBE_PROVIDER (PHEOBE-9):
     //   openai (default)  → the built-in per-turn Provider loop
@@ -72,10 +87,16 @@ pub fn run_task(
     let provider_name = std::env::var("PHEOBE_PROVIDER").unwrap_or_else(|_| "openai".to_string());
     let ttl = task.ttl.as_deref().map(aging::parse_ttl).transpose()?;
     let cfg = agent::LoopCfg {
-        max_turns: task.budget.as_ref().map(|b| b.max_iterations * 8).unwrap_or(60),
+        max_turns: task
+            .budget
+            .as_ref()
+            .map(|b| b.max_iterations * 8)
+            .unwrap_or(60),
         ttl,
         max_usd: task.budget.as_ref().and_then(|b| b.max_usd),
-        usd_per_mtok: std::env::var("PHEOBE_USD_PER_MTOK").ok().and_then(|v| v.parse().ok()),
+        usd_per_mtok: std::env::var("PHEOBE_USD_PER_MTOK")
+            .ok()
+            .and_then(|v| v.parse().ok()),
     };
     let outcome = match worker::worker_from_env(&provider_name)? {
         Some(w) => agent::run_worker(w.as_ref(), task, &wt, &task_id, &brief, &nudges, &cfg)?,
@@ -91,14 +112,25 @@ pub fn run_task(
     if outcome.ok && dirty {
         let (violations, byproducts) = worktree::check_allowlist(&wt, &task.paths_allow)?;
         if !byproducts.is_empty() {
-            progress(&format!("📝 bash-run byproducts (uncommitted, staged out): {}", byproducts.join(", ")));
+            progress(&format!(
+                "📝 bash-run byproducts (uncommitted, staged out): {}",
+                byproducts.join(", ")
+            ));
         }
         if !violations.is_empty() {
             let _ = learn::end_session(session.as_ref(), "allowlist_violation", 2);
-            let rep = report::HandoffReport::failure(&task.task, &format!("paths outside paths_allow: {}", violations.join(", ")));
+            let rep = report::HandoffReport::failure(
+                &task.task,
+                &format!("paths outside paths_allow: {}", violations.join(", ")),
+            );
             return Ok(rep);
         }
-        let sha = worktree::commit(&wt, &task_id, outcome.summary.as_deref().unwrap_or(&task.task), &task.paths_allow)?;
+        let sha = worktree::commit(
+            &wt,
+            &task_id,
+            outcome.summary.as_deref().unwrap_or(&task.task),
+            &task.paths_allow,
+        )?;
         commits.push(sha);
     }
 
@@ -111,7 +143,11 @@ pub fn run_task(
     if !ok {
         progress("❌ done_when failed");
     }
-    let _ = learn::end_session(session.as_ref(), if ok { "done" } else { "failed" }, if ok { 0 } else { 1 });
+    let _ = learn::end_session(
+        session.as_ref(),
+        if ok { "done" } else { "failed" },
+        if ok { 0 } else { 1 },
+    );
 
     let rep = report::HandoffReport {
         ok,
@@ -123,8 +159,15 @@ pub fn run_task(
         summary: outcome.summary,
         next_steps: outcome.next_steps,
         doubts: outcome.doubts,
-        blocked: if ok { None } else { outcome.blocked.or(Some("done_when failed".into())) },
-        usage: Some(report::Usage { turns: outcome.usage.turns, usd: None }),
+        blocked: if ok {
+            None
+        } else {
+            outcome.blocked.or(Some("done_when failed".into()))
+        },
+        usage: Some(report::Usage {
+            turns: outcome.usage.turns,
+            usd: None,
+        }),
     };
     if task.push && ok {
         worktree::push(&wt, rep.branch.clone().unwrap_or_default().as_str())?;

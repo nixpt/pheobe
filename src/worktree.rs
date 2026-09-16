@@ -34,11 +34,25 @@ fn is_source_checkout(repo: &Path) -> bool {
 /// wins; also prune stale registrations so `git worktree add` can't fail with
 /// "missing but already registered worktree" with no hint.
 pub fn next_free_branch(repo: &Path, base: &str) -> Result<String> {
-    let _ = run(Command::new("git").arg("-C").arg(repo).args(["worktree", "prune"]));
+    let _ = run(Command::new("git")
+        .arg("-C")
+        .arg(repo)
+        .args(["worktree", "prune"]));
     for i in 1..100 {
-        let candidate = if i == 1 { base.to_string() } else { format!("{base}-{i}") };
-        let exists = Command::new("git").arg("-C").arg(repo)
-            .args(["show-ref", "--verify", "--quiet", &format!("refs/heads/{candidate}")])
+        let candidate = if i == 1 {
+            base.to_string()
+        } else {
+            format!("{base}-{i}")
+        };
+        let exists = Command::new("git")
+            .arg("-C")
+            .arg(repo)
+            .args([
+                "show-ref",
+                "--verify",
+                "--quiet",
+                &format!("refs/heads/{candidate}"),
+            ])
             .status()
             .is_ok_and(|s| s.success());
         if !exists {
@@ -59,9 +73,18 @@ pub fn provision(repo: &Path, branch: &str) -> Result<(PathBuf, String)> {
         return provision_buckets(repo, &branch);
     }
     // plain git fallback
-    let wt = repo.join(format!("../{}-{}", repo.file_name().and_then(|n| n.to_str()).unwrap_or("repo"), branch.replace('/', "-")));
-    run(Command::new("git").arg("-C").arg(repo)
-        .args(["worktree", "add", &wt.to_string_lossy(), "-b", &branch]))?;
+    let wt = repo.join(format!(
+        "../{}-{}",
+        repo.file_name().and_then(|n| n.to_str()).unwrap_or("repo"),
+        branch.replace('/', "-")
+    ));
+    run(Command::new("git").arg("-C").arg(repo).args([
+        "worktree",
+        "add",
+        &wt.to_string_lossy(),
+        "-b",
+        &branch,
+    ]))?;
     Ok((wt, branch))
 }
 
@@ -69,13 +92,25 @@ fn buckets_available() -> bool {
     which("buckets")
 }
 fn which(bin: &str) -> bool {
-    Command::new("sh").args(["-c", &format!("command -v {bin} >/dev/null 2>&1")]).status().is_ok_and(|s| s.success())
+    Command::new("sh")
+        .args(["-c", &format!("command -v {bin} >/dev/null 2>&1")])
+        .status()
+        .is_ok_and(|s| s.success())
 }
 
 fn provision_buckets(repo: &Path, branch: &str) -> Result<(PathBuf, String)> {
-    let wt = run(Command::new("buckets")
-        .args(["worktree", "create", &repo.display().to_string(), branch]))?;
-    let last = wt.lines().last().context("buckets printed nothing")?.trim().to_string();
+    let wt = run(Command::new("buckets").args([
+        "worktree",
+        "create",
+        &repo.display().to_string(),
+        branch,
+    ]))?;
+    let last = wt
+        .lines()
+        .last()
+        .context("buckets printed nothing")?
+        .trim()
+        .to_string();
     if !Path::new(&last).is_dir() {
         bail!("buckets worktree create did not produce a directory: {last}")
     }
@@ -92,22 +127,32 @@ pub fn status_dirty(wt: &Path) -> Result<bool> {
     // only diff is `.pheobe/plan.json` did no work and has nothing to commit.
     Ok(status_porcelain(wt)?
         .into_iter()
-        .filter(|line| {
+        .find(|line| {
             porcelain_path(line)
                 .map(|p| !(p == ".pheobe" || p.starts_with(".pheobe/")))
                 .unwrap_or(true)
         })
-        .next()
         .is_some())
 }
 
 pub fn status_porcelain(wt: &Path) -> Result<Vec<String>> {
-    let out = Command::new("git").arg("-C").arg(wt).args(["status", "--porcelain"]).output()?;
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(wt)
+        .args(["status", "--porcelain"])
+        .output()?;
     if !out.status.success() {
-        bail!("git status failed: {}", String::from_utf8_lossy(&out.stderr).trim());
+        bail!(
+            "git status failed: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        );
     }
     let txt = String::from_utf8_lossy(&out.stdout);
-    Ok(txt.lines().map(|l| l.to_string()).filter(|l| !l.is_empty()).collect())
+    Ok(txt
+        .lines()
+        .map(|l| l.to_string())
+        .filter(|l| !l.is_empty())
+        .collect())
 }
 
 /// Extract the path from one raw porcelain line: `XY<space>path`, rename
@@ -124,7 +169,10 @@ fn porcelain_path(line: &str) -> Option<String> {
         rest
     };
     let path = path.trim();
-    let path = path.strip_prefix('"').and_then(|p| p.strip_suffix('"')).unwrap_or(path);
+    let path = path
+        .strip_prefix('"')
+        .and_then(|p| p.strip_suffix('"'))
+        .unwrap_or(path);
     if path.is_empty() {
         None
     } else {
@@ -141,16 +189,16 @@ pub fn check_allowlist(wt: &Path, paths_allow: &[String]) -> Result<(Vec<String>
     let mut violations = vec![];
     let mut byproducts = vec![];
     for line in status_porcelain(wt)? {
-        let Some(path) = porcelain_path(&line) else { continue };
+        let Some(path) = porcelain_path(&line) else {
+            continue;
+        };
         if path == ".pheobe" || path.starts_with(".pheobe/") {
             continue;
         }
-        let inside = paths_allow
-            .iter()
-            .any(|a| {
-                let a = a.trim_end_matches('/');
-                path == a || path.starts_with(a)
-            });
+        let inside = paths_allow.iter().any(|a| {
+            let a = a.trim_end_matches('/');
+            path == a || path.starts_with(a)
+        });
         if !inside {
             if line.starts_with("??") {
                 byproducts.push(path);
@@ -167,9 +215,14 @@ pub fn check_allowlist(wt: &Path, paths_allow: &[String]) -> Result<(Vec<String>
 /// commit), `.pheobe` excluded unconditionally.
 fn stage(wt: &Path, paths_allow: &[String]) -> Result<()> {
     if paths_allow.is_empty() {
-        return run(Command::new("git").arg("-C").arg(wt)
-            .args(["add", "-A", "--", ".", ":!/.pheobe"]))
-            .map(|_| ());
+        return run(Command::new("git").arg("-C").arg(wt).args([
+            "add",
+            "-A",
+            "--",
+            ".",
+            ":!/.pheobe",
+        ]))
+        .map(|_| ());
     }
     let mut args = vec!["add".to_string(), "-A".to_string(), "--".to_string()];
     for a in paths_allow {
@@ -184,11 +237,23 @@ pub fn commit(wt: &Path, task_id: &str, message: &str, paths_allow: &[String]) -
     stage(wt, paths_allow)?;
     let trailer = format!("Pheobe-Task: {task_id}");
     let hash = run(Command::new("git").arg("-C").arg(wt).args([
-        "-c", "user.name=pheobe", "-c", "user.email=pheobe@local",
-        "commit", "-m", message, "-m", &trailer, "--no-verify", "--quiet",
+        "-c",
+        "user.name=pheobe",
+        "-c",
+        "user.email=pheobe@local",
+        "commit",
+        "-m",
+        message,
+        "-m",
+        &trailer,
+        "--no-verify",
+        "--quiet",
     ]))?;
     let _ = hash;
-    let sha = run(Command::new("git").arg("-C").arg(wt).args(["rev-parse", "--short", "HEAD"]))?;
+    let sha = run(Command::new("git")
+        .arg("-C")
+        .arg(wt)
+        .args(["rev-parse", "--short", "HEAD"]))?;
     Ok(sha)
 }
 
@@ -198,6 +263,9 @@ pub fn push(wt: &Path, branch: &str) -> Result<()> {
         "main" | "master" | "dev" => bail!("refusing to ship protected branch"),
         _ => {}
     }
-    run(Command::new("git").arg("-C").arg(wt).args(["push", "-u", "origin", branch]))?;
+    run(Command::new("git")
+        .arg("-C")
+        .arg(wt)
+        .args(["push", "-u", "origin", branch]))?;
     Ok(())
 }

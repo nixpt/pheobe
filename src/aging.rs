@@ -41,12 +41,18 @@ pub const NARROW_INJECT: &str =
 
 impl Ladder {
     pub fn new(ttl: Option<Duration>) -> Self {
-        Ladder { ttl, warn_at: WARN_DEFAULT, narrow_at: NARROW_DEFAULT }
+        Ladder {
+            ttl,
+            warn_at: WARN_DEFAULT,
+            narrow_at: NARROW_DEFAULT,
+        }
     }
 
     /// State at a given elapsed time — pure, clock-free for tests.
     pub fn state_at(&self, elapsed: Duration) -> State {
-        let Some(ttl) = self.ttl else { return State::Alive };
+        let Some(ttl) = self.ttl else {
+            return State::Alive;
+        };
         if ttl.is_zero() {
             return State::Expired;
         }
@@ -81,7 +87,9 @@ impl Ladder {
 pub fn parse_ttl(s: &str) -> Result<Duration> {
     let s = s.trim();
     let (num, unit) = s.split_at(s.find(|c: char| !c.is_ascii_digit()).unwrap_or(s.len()));
-    let n: u64 = num.parse().map_err(|_| anyhow::anyhow!("bad ttl '{s}': not a number"))?;
+    let n: u64 = num
+        .parse()
+        .map_err(|_| anyhow::anyhow!("bad ttl '{s}': not a number"))?;
     let secs = match unit.trim() {
         "s" | "" => n,
         "m" => n * 60,

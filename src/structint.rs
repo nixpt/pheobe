@@ -62,7 +62,9 @@ fn is_executable(p: &Path) -> bool {
 fn path_env() -> Option<String> {
     let path = std::env::var_os("PATH")?;
     let parts: Vec<PathBuf> = std::env::split_paths(&path).collect();
-    std::env::join_paths(parts).ok().and_then(|p| p.into_string().ok())
+    std::env::join_paths(parts)
+        .ok()
+        .and_then(|p| p.into_string().ok())
 }
 
 /// Find the polydex backend on the current PATH (deprecation-safe).
@@ -89,7 +91,11 @@ pub fn index_status(worktree: &Path) -> Option<IndexStatus> {
         .output()
         .ok()?;
     if !out.status.success() {
-        return Some(IndexStatus { exists: false, stale: true, drift: vec![] });
+        return Some(IndexStatus {
+            exists: false,
+            stale: true,
+            drift: vec![],
+        });
     }
     let v: serde_json::Value = serde_json::from_slice(&out.stdout).ok()?;
     let exists = v.get("exists").and_then(|e| e.as_bool()).unwrap_or(false);
@@ -102,19 +108,31 @@ pub fn index_status(worktree: &Path) -> Option<IndexStatus> {
                     stale = true;
                     for item in list {
                         if let Some(s) = item.as_str() {
-                            drift.push(format!("{key}:{}", Path::new(s).file_name().map(|f| f.to_string_lossy().into_owned()).unwrap_or_else(|| s.to_string())));
+                            drift.push(format!(
+                                "{key}:{}",
+                                Path::new(s)
+                                    .file_name()
+                                    .map(|f| f.to_string_lossy().into_owned())
+                                    .unwrap_or_else(|| s.to_string())
+                            ));
                         }
                     }
                 }
             }
         }
     }
-    Some(IndexStatus { exists, stale, drift })
+    Some(IndexStatus {
+        exists,
+        stale,
+        drift,
+    })
 }
 
 /// Fresh when the backend exists AND the index exists AND nothing is dirty.
 pub fn polydex_fresh(worktree: &Path) -> bool {
-    index_status(worktree).map(|s| s.is_fresh()).unwrap_or(false)
+    index_status(worktree)
+        .map(|s| s.is_fresh())
+        .unwrap_or(false)
 }
 
 /// The honesty note a stale index gets, so the model knows the structural
@@ -220,8 +238,12 @@ pub fn languages(worktree: &Path) -> Result<Option<String>> {
 /// Returns "" when absent or stale — list the languages FIRST (small signal,
 /// cheap), then hotspots (the interesting meat).
 pub fn orient_brief(worktree: &Path) -> String {
-    let Some(bin) = polydex_bin() else { return String::new() };
-    let Some(st) = index_status(worktree) else { return String::new() };
+    let Some(bin) = polydex_bin() else {
+        return String::new();
+    };
+    let Some(st) = index_status(worktree) else {
+        return String::new();
+    };
     if !st.is_fresh() {
         return String::new();
     }
@@ -357,7 +379,11 @@ esac
         unsafe { std::env::set_var("PATH", format!("{}:{real_path}", dir.display())) };
         let st = index_status(&dir).expect("backend detected");
         assert!(!st.is_fresh(), "new files = stale");
-        assert!(st.drift.iter().any(|d| d.contains("lib.rs")), "drift names the file: {:?}", st.drift);
+        assert!(
+            st.drift.iter().any(|d| d.contains("lib.rs")),
+            "drift names the file: {:?}",
+            st.drift
+        );
         let note = stale_note(&st);
         assert!(note.contains("STALE INDEX"), "note says so: {note}");
         unsafe { std::env::set_var("PATH", &real_path) };
@@ -372,7 +398,12 @@ esac
         let dir = scratch("wrap");
         let (bin, cap) = fake_polydex(&dir);
         let real_path = std::env::var("PATH").unwrap_or_default();
-        unsafe { std::env::set_var("PATH", format!("{}:{real_path}", bin.parent().unwrap().display())) };
+        unsafe {
+            std::env::set_var(
+                "PATH",
+                format!("{}:{real_path}", bin.parent().unwrap().display()),
+            )
+        };
 
         let s = skeleton(&dir, "src/normalize.rs").unwrap().unwrap();
         assert!(s.contains("skel"), "skeleton served, got: {s}");
@@ -387,12 +418,12 @@ esac
 
         let cap = std::fs::read_to_string(&cap).unwrap();
         let lines: Vec<&str> = cap.lines().collect();
-        assert!(
-            lines.iter().any(|l| *l == "skeleton"),
-            "argv recorded, got: {lines:?}"
-        );
+        assert!(lines.contains(&"skeleton"), "argv recorded, got: {lines:?}");
         // every recorded invocation ran with cwd = worktree
-        assert!(lines.iter().filter(|l| l.starts_with("CWD=")).all(|l| *l == format!("CWD={}", dir.display())));
+        assert!(lines
+            .iter()
+            .filter(|l| l.starts_with("CWD="))
+            .all(|l| *l == format!("CWD={}", dir.display())));
         unsafe { std::env::set_var("PATH", &real_path) };
         std::fs::remove_dir_all(&dir).ok();
     }
@@ -405,17 +436,19 @@ esac
         let body = r#"if [ "$1" = status ]; then echo '{"exists":true,"freshness":{"modified_files":["src/lib.rs"],"new_files":[],"deleted_files":[]}}'; else echo 'should-not-serve'; fi"#;
         let bin = fake_bin(&dir, "polydex", body);
         let real_path = std::env::var("PATH").unwrap_or_default();
-        unsafe { std::env::set_var("PATH", format!("{}:{real_path}", bin.parent().unwrap().display())) };
+        unsafe {
+            std::env::set_var(
+                "PATH",
+                format!("{}:{real_path}", bin.parent().unwrap().display()),
+            )
+        };
 
         let out = skeleton(&dir, "src/normalize.rs").unwrap().unwrap();
         assert!(
             out.contains("STALE INDEX"),
             "fallback note served, got: {out}"
         );
-        assert!(
-            out.contains("lib.rs"),
-            "drift names the file, got: {out}"
-        );
+        assert!(out.contains("lib.rs"), "drift names the file, got: {out}");
         unsafe { std::env::set_var("PATH", &real_path) };
         std::fs::remove_dir_all(&dir).ok();
     }
@@ -429,7 +462,11 @@ esac
         let empty = dir.join("nothings");
         std::fs::create_dir_all(&empty).unwrap();
         unsafe { std::env::set_var("PATH", empty.display().to_string()) };
-        assert_eq!(orient_brief(&dir), "", "absent backend = no structural brief");
+        assert_eq!(
+            orient_brief(&dir),
+            "",
+            "absent backend = no structural brief"
+        );
         unsafe { std::env::set_var("PATH", &real_path) };
         std::fs::remove_dir_all(&dir).ok();
     }
@@ -443,8 +480,14 @@ esac
         unsafe { std::env::set_var("PATH", format!("{}:{real_path}", dir.display())) };
         let brief = orient_brief(&dir);
         assert!(brief.contains("## Structural read"), "got: {brief}");
-        assert!(brief.contains("indexed languages:") && brief.contains("Rust"), "got: {brief}");
-        assert!(brief.contains("hot: eval()"), "hotspots included, got: {brief}");
+        assert!(
+            brief.contains("indexed languages:") && brief.contains("Rust"),
+            "got: {brief}"
+        );
+        assert!(
+            brief.contains("hot: eval()"),
+            "hotspots included, got: {brief}"
+        );
         unsafe { std::env::set_var("PATH", &real_path) };
         std::fs::remove_dir_all(&dir).ok();
     }

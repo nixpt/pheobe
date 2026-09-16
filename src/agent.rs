@@ -6,9 +6,9 @@
 
 use crate::aging::{self, Ladder, State};
 use crate::llm::{Msg, Provider, ToolCall, Usage};
+use crate::task::Task;
 use crate::tools::{self, ToolCtx};
 use crate::worker::{Worker, WorkerOutcome};
-use crate::task::Task;
 use anyhow::Result;
 use serde_json::Value;
 use std::path::Path;
@@ -36,7 +36,12 @@ pub struct LoopCfg {
 
 impl Default for LoopCfg {
     fn default() -> Self {
-        LoopCfg { max_turns: 60, ttl: None, max_usd: None, usd_per_mtok: None }
+        LoopCfg {
+            max_turns: 60,
+            ttl: None,
+            max_usd: None,
+            usd_per_mtok: None,
+        }
     }
 }
 
@@ -54,7 +59,10 @@ pub fn run(
     let barn = tools::barn(&ctx);
     let schemas = tools::schemas(&barn);
 
-    let mut history = vec![Msg::system(system), Msg::user(format!("Begin. task_id={task_id}"))];
+    let mut history = vec![
+        Msg::system(system),
+        Msg::user(format!("Begin. task_id={task_id}")),
+    ];
     let ladder = Ladder::new(cfg.ttl);
     let started = Instant::now();
     let mut turns = 0;
@@ -133,14 +141,19 @@ pub fn run(
         }),
         None => serde_json::json!({
             "ok": false,
-            "summary": history.iter().filter_map(|m| m.content.as_deref()).last().unwrap_or("").to_string(),
+            "summary": history.iter().filter_map(|m| m.content.as_deref()).next_back().unwrap_or("").to_string(),
             "blocked": format!("max_turns ({}) reached without handoff", cfg.max_turns),
             "doubts": [],
             "next_steps": [],
         }),
     };
 
-    Ok(outcome_from_handoff(&handoff, turns, Some(total_tokens), history))
+    Ok(outcome_from_handoff(
+        &handoff,
+        turns,
+        Some(total_tokens),
+        history,
+    ))
 }
 
 /// The system prompt both dispatch paths share: the persona, the report
@@ -155,7 +168,8 @@ pub fn build_prompt(task: &Task, task_id: &str, brief: &str, nudges: &[String]) 
         "task: {}\ndone_when: `{}`\npaths_allow: {:?}\ntask_id: {task_id}\n",
         task.task,
         match &task.done_when {
-            crate::task::DoneWhen::Command { run, expect_exit } => format!("{run} [expect exit {expect_exit}]"),
+            crate::task::DoneWhen::Command { run, expect_exit } =>
+                format!("{run} [expect exit {expect_exit}]"),
         },
         task.paths_allow
     ));
@@ -225,12 +239,22 @@ pub fn run_worker(
 
     // deadline check BEFORE the worker call
     if let State::Expired = ladder.state_at(started.elapsed()) {
-        return Ok(outcome_from_handoff(&ttl_block(""), 0, None, vec![Msg::system(prompt.as_str())]));
+        return Ok(outcome_from_handoff(
+            &ttl_block(""),
+            0,
+            None,
+            vec![Msg::system(prompt.as_str())],
+        ));
     }
     // budget check BEFORE the call (nothing spent yet; a zero budget blocks)
     if let (Some(max_usd), Some(_rate)) = (cfg.max_usd, cfg.usd_per_mtok) {
         if 0.0 >= max_usd {
-            return Ok(outcome_from_handoff(&budget_block(0.0, 0), 0, None, vec![Msg::system(prompt.as_str())]));
+            return Ok(outcome_from_handoff(
+                &budget_block(0.0, 0),
+                0,
+                None,
+                vec![Msg::system(prompt.as_str())],
+            ));
         }
     }
 
@@ -268,7 +292,10 @@ pub fn run_worker(
         &handoff,
         1,
         wo.tokens,
-        vec![Msg::system(prompt.as_str()), Msg::assistant(wo.final_text.as_str(), vec![])],
+        vec![
+            Msg::system(prompt.as_str()),
+            Msg::assistant(wo.final_text.as_str(), vec![]),
+        ],
     ))
 }
 
@@ -322,16 +349,16 @@ fn outcome_from_handoff(
         next_steps: str_vec(handoff, "next_steps"),
         doubts: str_vec(handoff, "doubts"),
         blocked: handoff["blocked"].as_str().map(|s| s.to_string()),
-        usage: Usage { turns, total_tokens: tokens },
+        usage: Usage {
+            turns,
+            total_tokens: tokens,
+        },
         history,
     }
 }
 
-fn dispatch_logged(
-    barn: &[crate::tools::Tool],
-    ctx: &ToolCtx<'_>,
-    call: &ToolCall,
-) -> String {    let args: Value = serde_json::from_str(&call.function.arguments).unwrap_or(Value::Null);
+fn dispatch_logged(barn: &[crate::tools::Tool], ctx: &ToolCtx<'_>, call: &ToolCall) -> String {
+    let args: Value = serde_json::from_str(&call.function.arguments).unwrap_or(Value::Null);
     let name = call.function.name.as_str();
     match crate::tools::dispatch(barn, ctx, name, &args) {
         Ok(out) => out,
@@ -342,6 +369,10 @@ fn dispatch_logged(
 fn str_vec(v: &Value, key: &str) -> Vec<String> {
     v[key]
         .as_array()
-        .map(|a| a.iter().filter_map(|x| x.as_str().map(|s| s.to_string())).collect())
+        .map(|a| {
+            a.iter()
+                .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                .collect()
+        })
         .unwrap_or_default()
 }

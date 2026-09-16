@@ -2,8 +2,9 @@
 
 > A coding workhorse with no face. Task in, worktree branch out.
 
-**Status:** implemented — v0.1.0, `cargo install pheobe` (crates.io-ready
-metadata, no path-deps). Remote: `nixpt/pheobe` (GitHub). The contract below
+**Status:** implemented — v0.1.0 release candidate; crates.io-ready metadata,
+no path-deps, not yet published. Remote: `nixpt/pheobe` (GitHub, pending
+promotion — see `README.md` for install). The contract below
 is the shipped behavior, ratified by 100 green tests and live dispatches
 via bro's ACP (`bro synapse dispatch -- pheobe acp --stdio`).
 

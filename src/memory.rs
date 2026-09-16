@@ -81,7 +81,9 @@ pub fn current() -> &'static dyn MemoryStore {
         let mode = std::env::var("PHEOBE_MEMORY").unwrap_or_else(|_| "local".into());
         let store: Box<dyn MemoryStore> = match mode.as_str() {
             "none" => Box::new(NullStore),
-            "host" => HostStore::new().map(|s| Box::new(s) as Box<dyn MemoryStore>).unwrap_or_else(|_| Box::new(JsonlStore::new())),
+            "host" => HostStore::new()
+                .map(|s| Box::new(s) as Box<dyn MemoryStore>)
+                .unwrap_or_else(|_| Box::new(JsonlStore::new())),
             _ => Box::new(JsonlStore::new()),
         };
         let _ = STORE.set(store);
@@ -94,14 +96,18 @@ pub fn current() -> &'static dyn MemoryStore {
 struct JsonlStore;
 
 impl JsonlStore {
-    fn new() -> Self { Self }
+    fn new() -> Self {
+        Self
+    }
 }
 
 fn learning_dir() -> Option<PathBuf> {
     if let Ok(d) = std::env::var("PHEOBE_LEARNING_DIR") {
         return Some(PathBuf::from(d));
     }
-    std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".pheobe").join("learning"))
+    std::env::var("HOME")
+        .ok()
+        .map(|h| PathBuf::from(h).join(".pheobe").join("learning"))
 }
 
 fn jsonl_enabled() -> bool {
@@ -116,7 +122,10 @@ fn append_jsonl(file: &Path, line: &str) -> anyhow::Result<()> {
     if let Some(parent) = file.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    let mut f = std::fs::OpenOptions::new().create(true).append(true).open(file)?;
+    let mut f = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(file)?;
     writeln!(f, "{line}")?;
     Ok(())
 }
@@ -126,12 +135,18 @@ fn append_jsonl(file: &Path, line: &str) -> anyhow::Result<()> {
 fn bin_is_resolvable(cmd: &str) -> bool {
     use std::os::unix::fs::PermissionsExt;
     if cmd.contains('/') {
-        return std::fs::metadata(cmd).map(|m| m.is_file() && m.permissions().mode() & 0o111 != 0).unwrap_or(false);
+        return std::fs::metadata(cmd)
+            .map(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
+            .unwrap_or(false);
     }
-    let Ok(paths) = std::env::var("PATH") else { return false };
+    let Ok(paths) = std::env::var("PATH") else {
+        return false;
+    };
     paths.split(':').any(|d| {
         let p = Path::new(d).join(cmd);
-        std::fs::metadata(&p).map(|m| m.is_file() && m.permissions().mode() & 0o111 != 0).unwrap_or(false)
+        std::fs::metadata(&p)
+            .map(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
+            .unwrap_or(false)
     })
 }
 
@@ -150,7 +165,12 @@ fn now_iso() -> String {
     let days = secs / 86400;
     let rem = secs % 86400;
     let (y, m, d) = civil_from_days(days);
-    format!("{y:04}-{m:02}-{d:02}T{:02}:{:02}:{:02}Z", (rem / 3600), (rem % 3600) / 60, rem % 60)
+    format!(
+        "{y:04}-{m:02}-{d:02}T{:02}:{:02}:{:02}Z",
+        (rem / 3600),
+        (rem % 3600) / 60,
+        rem % 60
+    )
 }
 
 fn civil_from_days(z: i64) -> (i64, i64, i64) {
@@ -167,10 +187,14 @@ fn civil_from_days(z: i64) -> (i64, i64, i64) {
 }
 
 impl MemoryStore for JsonlStore {
-    fn enabled(&self) -> bool { jsonl_enabled() }
+    fn enabled(&self) -> bool {
+        jsonl_enabled()
+    }
 
     fn session_begin(&self, repo: &Path, task: &str) -> Result<Option<Session>> {
-        if !self.enabled() { return Ok(None); }
+        if !self.enabled() {
+            return Ok(None);
+        }
         let s = Session {
             id: format!("s-{}", now_unix()),
             repo: repo.display().to_string(),
@@ -188,22 +212,31 @@ impl MemoryStore for JsonlStore {
 
     fn session_end(&self, s: Option<&Session>, outcome: &str, exit: i32) -> Result<()> {
         let Some(s) = s else { return Ok(()) };
-        if !self.enabled() { return Ok(()); }
+        if !self.enabled() {
+            return Ok(());
+        }
         let closed = Session {
-            id: s.id.clone(), repo: s.repo.clone(), task: s.task.clone(),
+            id: s.id.clone(),
+            repo: s.repo.clone(),
+            task: s.task.clone(),
             started_at: s.started_at.clone(),
             ended_at: Some(now_iso()),
             outcome: Some(outcome.to_string()),
             exit_code: Some(exit),
         };
         if let Some(dir) = learning_dir() {
-            append_jsonl(&dir.join("sessions.jsonl"), &serde_json::to_string(&closed)?)?;
+            append_jsonl(
+                &dir.join("sessions.jsonl"),
+                &serde_json::to_string(&closed)?,
+            )?;
         }
         Ok(())
     }
 
     fn log_event(&self, session: &str, kind: &str, tool: Option<&str>, payload: Option<&str>) {
-        if !self.enabled() { return; }
+        if !self.enabled() {
+            return;
+        }
         let ev = serde_json::json!({
             "session": session, "ts": now_iso(), "kind": kind,
             "tool": tool, "payload": payload,
@@ -229,8 +262,12 @@ impl MemoryStore for JsonlStore {
     }
 
     fn nudges_for(&self, repo: &str) -> Vec<String> {
-        if !self.enabled() { return vec![]; }
-        let Some(dir) = learning_dir() else { return vec![] };
+        if !self.enabled() {
+            return vec![];
+        }
+        let Some(dir) = learning_dir() else {
+            return vec![];
+        };
         let Ok(txt) = std::fs::read_to_string(dir.join("nudges.jsonl")) else {
             return vec![];
         };
@@ -247,12 +284,22 @@ impl MemoryStore for JsonlStore {
 struct NullStore;
 
 impl MemoryStore for NullStore {
-    fn enabled(&self) -> bool { false }
-    fn session_begin(&self, _repo: &Path, _task: &str) -> Result<Option<Session>> { Ok(None) }
-    fn session_end(&self, _s: Option<&Session>, _outcome: &str, _exit: i32) -> Result<()> { Ok(()) }
+    fn enabled(&self) -> bool {
+        false
+    }
+    fn session_begin(&self, _repo: &Path, _task: &str) -> Result<Option<Session>> {
+        Ok(None)
+    }
+    fn session_end(&self, _s: Option<&Session>, _outcome: &str, _exit: i32) -> Result<()> {
+        Ok(())
+    }
     fn log_event(&self, _session: &str, _kind: &str, _tool: Option<&str>, _payload: Option<&str>) {}
-    fn store_nudge(&self, _repo: &str, _text: &str, _trigger_terms: Option<&str>) -> Result<()> { Ok(()) }
-    fn nudges_for(&self, _repo: &str) -> Vec<String> { vec![] }
+    fn store_nudge(&self, _repo: &str, _text: &str, _trigger_terms: Option<&str>) -> Result<()> {
+        Ok(())
+    }
+    fn nudges_for(&self, _repo: &str) -> Vec<String> {
+        vec![]
+    }
 }
 
 // ── HostStore (joker-mcp MCP stdio, best-effort) ──────────────────────────────
@@ -264,12 +311,14 @@ struct HostStore {
 
 impl HostStore {
     fn new() -> Result<Self> {
-        let bin = std::env::var("PHEOBE_JOKER_CMD")
-            .unwrap_or_else(|_| "joker-mcp".to_string());
+        let bin = std::env::var("PHEOBE_JOKER_CMD").unwrap_or_else(|_| "joker-mcp".to_string());
         if !bin_is_resolvable(&bin) {
             return Err(anyhow::anyhow!("{bin}: not found on PATH"));
         }
-        Ok(Self { bin, doubt: std::sync::OnceLock::new() })
+        Ok(Self {
+            bin,
+            doubt: std::sync::OnceLock::new(),
+        })
     }
 
     fn mcp_call(&self, tool: &str, args: serde_json::Value) -> Option<String> {
@@ -286,8 +335,11 @@ impl HostStore {
             "params":{"name": tool, "arguments": args}});
 
         let mut child = Command::new(&self.bin)
-            .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null())
-            .spawn().ok()?;
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .ok()?;
 
         // reader thread: joker-mcp is request/response over its stdin — we keep
         // the stdin open, handshake, read the id:2 line, then kill it.
@@ -296,20 +348,23 @@ impl HostStore {
         let t = std::thread::spawn(move || {
             let mut lines = BufReader::new(stdout).lines();
             while let Some(Ok(l)) = lines.next() {
-                if tx.send(l).is_err() { break; }
+                if tx.send(l).is_err() {
+                    break;
+                }
             }
         });
 
-        let write = |s: &mut std::process::ChildStdin, line: String| {
-            writeln!(s, "{line}").ok()
-        };
+        let write = |s: &mut std::process::ChildStdin, line: String| writeln!(s, "{line}").ok();
         {
             let stdin = child.stdin.as_mut()?;
             write(stdin, init.to_string())?;
             // wait for the initialize ack before proceeding
             match rx.recv_timeout(Duration::from_secs(5)) {
                 Ok(_) => {}
-                Err(_) => { let _ = child.kill(); return None; }
+                Err(_) => {
+                    let _ = child.kill();
+                    return None;
+                }
             }
             write(stdin, notif.to_string())?;
             write(stdin, call.to_string())?;
@@ -322,7 +377,9 @@ impl HostStore {
                 Ok(line) => {
                     if let Ok(v) = serde_json::from_str::<serde_json::Value>(&line) {
                         if v.get("id") == Some(&serde_json::json!(2)) {
-                            if let Some(content) = v.pointer("/result/content").and_then(|c| c.get(0)) {
+                            if let Some(content) =
+                                v.pointer("/result/content").and_then(|c| c.get(0))
+                            {
                                 let _ = child.kill();
                                 return Some(content.get("text")?.as_str()?.to_string());
                             }
@@ -343,7 +400,9 @@ impl HostStore {
 }
 
 impl MemoryStore for HostStore {
-    fn enabled(&self) -> bool { true }
+    fn enabled(&self) -> bool {
+        true
+    }
 
     fn session_begin(&self, repo: &Path, task: &str) -> Result<Option<Session>> {
         // joker doesn't manage sessions; fall through to local tracking
@@ -360,36 +419,52 @@ impl MemoryStore for HostStore {
 
     fn store_nudge(&self, repo: &str, text: &str, trigger_terms: Option<&str>) -> Result<()> {
         let fact = format!("nudge[{repo}]: {text}");
-        match self.mcp_call("joker_store_fact", serde_json::json!({
-            "fact": fact, "category": "pheobe",
-        })) {
+        match self.mcp_call(
+            "joker_store_fact",
+            serde_json::json!({
+                "fact": fact, "category": "pheobe",
+            }),
+        ) {
             Some(_) => Ok(()),
             None => {
-                eprintln!("⚠ host store_nudge failed ({})", self.doubt("joker-mcp store failed; falling back to local"));
+                eprintln!(
+                    "⚠ host store_nudge failed ({})",
+                    self.doubt("joker-mcp store failed; falling back to local")
+                );
                 JsonlStore.store_nudge(repo, text, trigger_terms)
             }
         }
     }
 
     fn nudges_for(&self, repo: &str) -> Vec<String> {
-        match self.mcp_call("joker_recall_facts", serde_json::json!({
-            "category": "pheobe", "query": format!("nudge[{repo}]"),
-        })) {
+        match self.mcp_call(
+            "joker_recall_facts",
+            serde_json::json!({
+                "category": "pheobe", "query": format!("nudge[{repo}]"),
+            }),
+        ) {
             Some(resp) => {
                 if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&resp) {
                     if let Some(facts) = parsed.get("facts").and_then(|f| f.as_array()) {
-                        return facts.iter()
+                        return facts
+                            .iter()
                             .filter_map(|f| f.get("content")?.as_str().map(String::from))
                             .filter(|s| s.starts_with(&format!("nudge[{repo}]")))
                             .map(|s| s.replacen(&format!("nudge[{repo}]: "), "", 1))
                             .collect();
                     }
                 }
-                eprintln!("⚠ host nudges_for parse failed ({})", self.doubt("joker-mcp parse failed; using local"));
+                eprintln!(
+                    "⚠ host nudges_for parse failed ({})",
+                    self.doubt("joker-mcp parse failed; using local")
+                );
                 JsonlStore.nudges_for(repo)
             }
             None => {
-                eprintln!("⚠ host nudges_for failed ({})", self.doubt("joker-mcp recall failed; using local"));
+                eprintln!(
+                    "⚠ host nudges_for failed ({})",
+                    self.doubt("joker-mcp recall failed; using local")
+                );
                 JsonlStore.nudges_for(repo)
             }
         }
@@ -433,8 +508,12 @@ pub(crate) mod tests {
         let s = JsonlStore;
         assert!(s.enabled());
 
-        let sess = s.session_begin(Path::new("/tmp/repo"), "write tests").unwrap().unwrap();
-        s.store_nudge("/tmp/repo", "watch for semicolons", Some("syntax")).unwrap();
+        let sess = s
+            .session_begin(Path::new("/tmp/repo"), "write tests")
+            .unwrap()
+            .unwrap();
+        s.store_nudge("/tmp/repo", "watch for semicolons", Some("syntax"))
+            .unwrap();
         let nudges = s.nudges_for("/tmp/repo");
         assert_eq!(nudges.len(), 1);
         assert!(nudges[0].contains("semicolons"));
@@ -461,7 +540,9 @@ pub(crate) mod tests {
         assert!(HostStore::new().is_err());
         let store = crate::memory::current();
         assert!(store.enabled()); // fell back to local
-        store.store_nudge("/tmp/repo", "local fallback works", None).unwrap();
+        store
+            .store_nudge("/tmp/repo", "local fallback works", None)
+            .unwrap();
         assert_eq!(store.nudges_for("/tmp/repo").len(), 1);
 
         unsafe { std::env::remove_var("PHEOBE_LEARNING_DIR") };

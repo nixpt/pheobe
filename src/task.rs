@@ -68,7 +68,10 @@ fn default_max_iterations() -> u32 {
 
 impl Default for Budget {
     fn default() -> Self {
-        Budget { max_iterations: default_max_iterations(), max_usd: None }
+        Budget {
+            max_iterations: default_max_iterations(),
+            max_usd: None,
+        }
     }
 }
 
@@ -123,7 +126,13 @@ impl Task {
         // Fuzziness gate (mayfly's rule, intentionally strict). Heuristics, not law —
         // but a vague ask dies here rather than burning budget.
         let t = self.task.to_lowercase();
-        for verb in ["polish", "improve", "rethink", "make better", "clean up the whole"] {
+        for verb in [
+            "polish",
+            "improve",
+            "rethink",
+            "make better",
+            "clean up the whole",
+        ] {
             if t.contains(verb) {
                 bail!("vague ask: contains '{verb}' — state the concrete change and done_when");
             }

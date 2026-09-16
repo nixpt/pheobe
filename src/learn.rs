@@ -5,11 +5,15 @@
 //! `PHEOBE_MEMORY` at run start via `memory::init()`). The store can be
 //! swapped without touching callers.
 
-pub use crate::memory::{Session, Nudge};
+pub use crate::memory::{Nudge, Session};
 
-pub fn init() { crate::memory::init(); }
+pub fn init() {
+    crate::memory::init();
+}
 
-pub fn enabled() -> bool { crate::memory::current().enabled() }
+pub fn enabled() -> bool {
+    crate::memory::current().enabled()
+}
 
 pub fn begin_session(repo: &std::path::Path, task: &str) -> anyhow::Result<Option<Session>> {
     crate::memory::current().session_begin(repo, task)

@@ -65,18 +65,15 @@ pub async fn serve_stdio() -> anyhow::Result<()> {
 
 /// The sessionful ACP server. Each session carries the worktree the dispatch
 /// will cook in — session/new's cwd, validated to be inside a git repo.
+#[derive(Default)]
 struct SessionStore {
     /// Maps ACP session id → the repo path for that session's run.
     sessions: std::collections::HashMap<String, String>,
 }
 
-impl Default for SessionStore {
-    fn default() -> Self {
-        SessionStore { sessions: Default::default() }
-    }
-}
-
-pub async fn serve(transport: impl agent_client_protocol::ConnectTo<Agent> + 'static) -> anyhow::Result<()> {
+pub async fn serve(
+    transport: impl agent_client_protocol::ConnectTo<Agent> + 'static,
+) -> anyhow::Result<()> {
     let store = std::sync::Arc::new(tokio::sync::Mutex::new(SessionStore::default()));
     let store_new = store.clone();
     let store_prompt = store.clone();
@@ -217,7 +214,10 @@ fn finish_notification(rep: &report::HandoffReport) -> String {
 /// dispatch sessions), but it must be a valid ACP SessionId — opaque string.
 fn new_session_id() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
-    let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
     format!("pheobe-{nanos:x}")
 }
 
@@ -229,9 +229,9 @@ mod tests {
     use std::ops::AsyncFnOnce;
 
     use super::*;
-    use agent_client_protocol::SessionMessage;
     use agent_client_protocol::schema::v1::{ContentBlock, SessionUpdate};
     use agent_client_protocol::schema::ProtocolVersion;
+    use agent_client_protocol::SessionMessage;
     use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 
     /// In-memory stand-in for the stdio transport: two duplex byte streams
@@ -262,11 +262,12 @@ mod tests {
         /// drive it from the client side with the crate's own `Client` role.
         async fn drive<F, T>(self, main: F) -> Result<T, agent_client_protocol::Error>
         where
-            F: for<'a> AsyncFnOnce(ConnectionTo<Agent>) -> Result<T, agent_client_protocol::Error>,
+            F: AsyncFnOnce(ConnectionTo<Agent>) -> Result<T, agent_client_protocol::Error>,
             T: Send + 'static,
         {
             let server = tokio::spawn(serve(self.server));
-            let result = Client.builder()
+            let result = Client
+                .builder()
                 .name("pheobe-wire-test")
                 .connect_with(self.client, main)
                 .await;
@@ -290,17 +291,24 @@ mod tests {
                 // server advertises capabilities; meta attached as _meta
                 assert!(init.meta.is_some(), "server should attach meta");
                 // session/new with a sane cwd → gets a session id back
-                let cwd = std::env::current_dir().map_err(agent_client_protocol::util::internal_error)?;
+                let cwd =
+                    std::env::current_dir().map_err(agent_client_protocol::util::internal_error)?;
                 let session_resp: NewSessionResponse = cx
                     .send_request(NewSessionRequest::new(cwd))
                     .block_task()
                     .await?;
-                assert!(!session_resp.session_id.0.is_empty(), "session id must be non-empty");
+                assert!(
+                    !session_resp.session_id.0.is_empty(),
+                    "session id must be non-empty"
+                );
                 Ok(session_resp.session_id.0.as_ref().to_string())
             })
             .await;
         let id = result.expect("wire drive must succeed");
-        assert!(id.starts_with("pheobe-"), "session id should be a pheobe id, got {id}");
+        assert!(
+            id.starts_with("pheobe-"),
+            "session id should be a pheobe id, got {id}"
+        );
     }
 
     /// Prompt with an UNKNOWN task (invalid task JSON) must yield a
@@ -323,8 +331,7 @@ mod tests {
                     .block_task()
                     .await?
                     .session_id;
-                let session = cx
-                    .build_session(&cwd)
+                cx.build_session(&cwd)
                     .block_task()
                     .run_until(async |mut session| {
                         session
@@ -335,19 +342,26 @@ mod tests {
                         loop {
                             match session.read_update().await? {
                                 SessionMessage::SessionMessage(dispatch) => {
-                                    let _ = agent_client_protocol::util::MatchDispatch::new(dispatch)
-                                        .if_notification(async |notif: SessionNotification| {
-                                            if let SessionUpdate::AgentMessageChunk(chunk) = notif.update {
-                                                if let ContentBlock::Text(t) = chunk.content {
-                                                    text.push_str(&t.text);
+                                    let _ =
+                                        agent_client_protocol::util::MatchDispatch::new(dispatch)
+                                            .if_notification(async |notif: SessionNotification| {
+                                                if let SessionUpdate::AgentMessageChunk(chunk) =
+                                                    notif.update
+                                                {
+                                                    if let ContentBlock::Text(t) = chunk.content {
+                                                        text.push_str(&t.text);
+                                                    }
                                                 }
-                                            }
-                                            Ok(())
-                                        })
-                                        .await;
+                                                Ok(())
+                                            })
+                                            .await;
                                 }
                                 SessionMessage::StopReason(reason) => {
-                                    assert_eq!(reason, StopReason::Refusal, "bad task must refuse; chunks so far: {text}");
+                                    assert_eq!(
+                                        reason,
+                                        StopReason::Refusal,
+                                        "bad task must refuse; chunks so far: {text}"
+                                    );
                                     break;
                                 }
                                 _ => {}
@@ -360,7 +374,6 @@ mod tests {
                         Ok::<_, agent_client_protocol::Error>(())
                     })
                     .await?;
-                let _ = &session;
                 Ok(())
             })
             .await;

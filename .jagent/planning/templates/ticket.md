@@ -1,8 +1,8 @@
-# EXS-NNN — {{title}}
+# PHEOBE-NNN — {{title}}
 
 | Field | Value |
 |-------|-------|
-| **ID** | EXS-NNN |
+| **ID** | PHEOBE-NNN |
 | **Priority** | P1 / P2 / P3 / P4 / P5 |
 | **Status** | Backlog / In Progress / Done |
 | **Phase** | {{milestone}} |
