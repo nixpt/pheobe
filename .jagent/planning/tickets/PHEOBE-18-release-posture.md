@@ -24,7 +24,9 @@ dep (e.g. mayfly's future `harness: "pheobe"`).
       in Cargo.toml), `cargo doc --no-deps` zero warnings, default
       build has no peer path-deps (`cargo tree` audit).
 - [x] GitHub release workflow (bump-version.sh + release.yml, mayfly's
-      v0.1.x precedent), remote `nixpt/pheobe` created.
+      v0.1.x precedent). Remote `nixpt/pheobe` creation held off by the
+      captain (local-only posture for now) — run `gh repo create
+      nixpt/pheobe` + push main + hand-tag `v0.1.0` when promoting.
 - [x] `pheobe/DESIGN.md` position-table updated with the real remote +
       version.
 - [x] AGENTS.md (workspace) gains the pheobe entry with lineage one-liner
@@ -59,3 +61,8 @@ dep (e.g. mayfly's future `harness: "pheobe"`).
 - **Workspace AGENTS.md:** pheobe peer entry added under the mayfly
   sibling block (lineage one-liner: headless coding workhorse, worker
   adapters, ACP surface, memory trait, no path-deps, remote @ v0.1.0).
+- **Held off (captain's call):** the GitHub remote itself — `gh repo
+  create nixpt/pheobe` (private/public), push of main, and the hand-tag
+  v0.1.0. The Cargo.toml `repository` field + DESIGN.md already point at
+  `github.com/nixpt/pheobe`; create the remote there (or adjust those two
+  pointers) when promoting.
