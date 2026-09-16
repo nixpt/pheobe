@@ -109,6 +109,38 @@ The loop is a plain turn loop (uno `step()`-shaped, see below) — no
 interactive state machine, no session resume. A pheobe run that dies is
 re-run from scratch; the plan file is the only durable intermediate state.
 
+## Loops & graphs engineering — surveyed, mostly declined
+
+Workspace survey (runes `RuneGraph`, contextgc `recall_graph`, polydex
+`traverse.rs`, crush-visuals `VisualGraph`/`ExecutionTrace`, flownet,
+event-horizon, holon/nexus/foreman): **the fleet has no workflow engine or
+task-DAG executor to reuse, and no project models agent loops as state
+machines.** Findings and decisions:
+
+1. **The loop stays a linear spine.** It has exactly one back-edge
+   (verify → iterate → plan) — modeling that as a state graph or workflow
+   engine would be over-engineering. The aging ladder (PHEOBE-2) is
+   already the formalized state machine the loop needs: four states,
+   deterministic transitions, tested without a clock.
+2. **Plan steps stay a linear list, not a DAG.** A single worker with no
+   parallelism gets no payoff from dependency edges; `RuneGraph` (the
+   fleet's semantic-DAG shape) is a data model without validation
+   algorithms — borrowing it would add structure without payoff. If
+   parallel step execution ever arrives, the DAG upgrade happens in
+   `.pheobe/plan.json`'s schema, not in a new engine.
+3. **The one idiom worth copying is polydex's traverse discipline** —
+   bounded BFS, visited-set cycle bail with a surfaced `cycle_detected`,
+   hard depth caps. pheobe's loop already implements its moral equivalent
+   (`max_turns`, the aging ladder's hard stop, the no-thrash rule), so
+   nothing to port now; the idiom matters if iterate-stage replanning
+   ever grows a graph walk.
+4. **Call-graph reuse stays where it is**: blast radius is polydex's job
+   (`impact`/`affected-tests` in the read ladder), not pheobe's.
+5. **Later, presentation-only:** crush-visuals' `ExecutionTrace` as an
+   optional handoff-report artifact (a run as a serializable trace
+   payload for the parent's debugger view). Deferred until a consumer
+   asks for it.
+
 ## Task schema (v0)
 
 ```json
