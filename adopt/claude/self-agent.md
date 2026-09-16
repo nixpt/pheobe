@@ -1,7 +1,11 @@
 # pheobe — Claude Code subagent (self mode)
 
 Spawns pheobe's own loop on pheobe's own endpoint and reads the handoff
-report. Claude is the parent, not the engine.
+report. Claude is the parent, not the engine. Two install routes reach
+the same def: the `.claude/agents/pheobe.md` file (Claude Code + Agent
+SDK both load it from disk), or the SDK's `AgentDefinition` in code
+(Python: `agents={"pheobe": AgentDefinition(...)}; the SDK's own loop is
+the Claude Code CLI bundled — same substrate as the subprocess route).
 
 ## Install
 
@@ -50,3 +54,25 @@ You are the pheobe dispatcher. When this subagent is invoked with a task:
   (kitchen/buckets ladder) and the parent merges.
 - The report is the contract. `branch` means the branch; `doubts` means
   unverified assumptions; `next_steps` means actions for you.
+
+## Agent SDK variant (Python, source-grounded: `AgentDefinition` in types.py)
+
+```python
+from claude_agent_sdk import ClaudeSDKClient, AgentDefinition
+
+pheobe = AgentDefinition(
+    description="A scoped coding workhorse. One concrete task with a "
+                "mechanical done condition; works in its own worktree; "
+                "hands off a JSON report. Not for open-ended asks.",
+    prompt=open("adopt/claude/self-agent.md").read().split("## Agent definition")[1],
+    tools=["Bash"],            # the dispatcher needs bash only
+    disallowedTools=["Task"],  # pheobe subagents cannot fan out
+    maxTurns=8,
+)
+
+# use: client with agents={"pheobe": pheobe}; the subagent's final message
+# is the pheobe JSON report — parse and act per the Rules below.
+```
+
+The `disallowedTools=["Task"]` enforces pheobe's no-recursive-spawning rule
+at the SDK layer, same as opencode's subagent permission derivation does.

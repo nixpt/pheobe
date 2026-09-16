@@ -750,6 +750,72 @@ provide the requested tier → `{ok:false, blocked:"sandbox_unavailable"}`.
 `--attach` both supported, report normalization, `pheobe adopt opencode`
 extended to emit all three files + the jsonc snippet.
 
+## Claude integration (three surfaces — source-grounded)
+
+Reference material on disk: `claude` CLI 2.1.273 on this box,
+`/workspace/external/claude-agent-sdk-typescript` (SDK 0.3.273) and
+`/workspace/external/claude-agent-sdk-python` (SDK 0.2.153), plus the
+`ant` CLI 1.30.0 in `~/.local/bin` (typed Anthropic-API client, Go).
+
+The landscape (per docs + SDK source):
+
+- **Agent SDK** (TS/Python) = Claude Code's agent loop as a library —
+  built-in tools, hooks, subagents, sessions, permissions, skills/plugins
+  loading from `.claude/` and `~/.claude/`. **The Python SDK ships the
+  Claude Code CLI bundled** (`src/claude_agent_sdk/_bundled`,
+  `_cli_version.py` = 2.1.273) — the SDK is the CLI wrapped, so the SDK
+  surface and the subprocess surface are the same substrate.
+- **The documented escape hatch for other languages is exactly pheobe's
+  shape:** "run the CLI as a subprocess with the `-p` flag and
+  `--output-format json`" (agent-sdk overview). Claude is one of mayfly's
+  proven adapters already (`claude -p … --dangerously-skip-permissions`).
+
+### Surface 1 — pheobe as dispatcher-def subagent (native)
+
+Claude's subagent surface is `.claude/agents/<name>.md` (frontmatter:
+name, description, tools, model) — the kit ships `adopt/claude/
+self-agent.md` (claude spawns `pheobe run --json`, reads the report).
+Agent SDK equivalently: subagents defined in code or loaded from the
+same `.claude/` files — both routes reach the same def.
+
+### Surface 2 — worker adapter (`PHEOBE_PROVIDER=claude`)
+
+Same mayfly-inversion as the opencode worker adapter: pheobe keeps the
+mechanical half (intake gate, worktree, aging ladder, done_when,
+allowlist, pathspec commit, report) and delegates the turn loop to
+`claude -p <protocol envelope> --output-format json`. Env:
+`PHEOBE_PROVIDER=claude`, `PHEOBE_CLAUDE_BIN` (default `claude`),
+`PHEOBE_CLAUDE_FLAGS` (default `--dangerously-skip-permissions` — headless
+has no approval path; the permit surface is the task's `paths_allow` +
+done_when). Aging ladder wraps the subprocess (kill on expiry,
+`ttl_exceeded` as task-design failure). Ticketed PHEOBE-5.
+
+### Surface 3 — `ant` as a provider adapter (later)
+
+pheobe's wire is OpenAI-shaped; Claude's Messages API is not. The `ant`
+CLI gives a cheap anthropic-shaped client without writing a provider:
+`ant messages create --model claude-opus-5 …` as a bridge tool, or a
+dedicated `Anthropic` Provider impl later (uno already has one to port —
+uno-as-feature). Anthropic auth on this fleet flows through `ccf`/flownet
+env — same constraint mayfly documents for its `claude`/`ccf` harnesses.
+
+### Sandbox tier ↔ claude
+
+| pheobe tier | claude surface |
+|---|---|
+| strict | self mode only (pheobe/buckets own the namespace); SDK-side: a hooks-gated permission profile could approximate, but no namespace — fail closed |
+| moderate | `.claude/agents` def with a restricted `tools` list + the permission system (ask-by-default); SDK: permission callbacks |
+| free | CLI with `--dangerously-skip-permissions` + pheobe's own policy invariants (safe-exec, paths_allow, no protected branches) |
+
+Degradation rule unchanged: host can't provide the tier →
+`{ok:false, blocked:"sandbox_unavailable"}`.
+
+### Ticket
+
+**PHEOBE-5** (planning board): implement Surface 2's claude worker adapter
+(`Worker` trait reuse from PHEOBE-4), plus `pheobe adopt claude` extended
+to emit the subagent def + the SDK-snippet variant.
+
 ## Persona & skills
 
 The persona is not invented — it is mined from the people who built the
