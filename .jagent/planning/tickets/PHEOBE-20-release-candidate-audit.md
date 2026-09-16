@@ -1,8 +1,8 @@
-# PHEOBE-19 — release candidate audit: license, README, CI gate, lint
+# PHEOBE-20 — release candidate audit: license, README, CI gate, lint
 
 | Field | Value |
 |-------|-------|
-| **ID** | PHEOBE-19 |
+| **ID** | PHEOBE-20 |
 | **Priority** | P2 |
 | **Status** | Done |
 | **Phase** | W5 — release |
@@ -50,6 +50,6 @@ have tagged v0.1.1 off an unlinted tree.
 
 ## Resolution
 
-Branch `agent/foreman/PHEOBE-19-rc-audit` from `fec675f`. Verified:
+Branch `agent/foreman/PHEOBE-20-rc-audit` from `fec675f`. Verified:
 100 tests green, clippy/fmt clean, `cargo package` builds the tarball and
 the isolated verify build passes.

@@ -10,8 +10,8 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 
 - [x] `cargo build --release` clean
 - [x] `cargo test` green — 100 tests (`src/tests.rs` + per-module tests)
-- [x] `cargo clippy --all-targets -- -D warnings` + `cargo fmt --check` clean (PHEOBE-19)
-- [x] CI: `.github/workflows/ci.yml` (fmt, clippy, test, package) + release gate (PHEOBE-19)
+- [x] `cargo clippy --all-targets -- -D warnings` + `cargo fmt --check` clean (PHEOBE-20)
+- [x] CI: `.github/workflows/ci.yml` (fmt, clippy, test, package) + release gate (PHEOBE-20)
 - [x] **issue 01** — allowlist off-by-one on the first porcelain line (Done, PHEOBE-3)
 - [x] **issue 02** — own state dir counted as an allowlist violation (Done, PHEOBE-3)
 - [x] **issue 03** — existing slug branch reused silently (Done, PHEOBE-3)
@@ -46,7 +46,7 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 ## W5 — release
 
 - [x] PHEOBE-18 — release posture: publish readiness, bump kit, `release.yml`
-- [x] PHEOBE-19 — release candidate audit: LICENSE-APACHE, README, CI gate, clippy/fmt
+- [x] PHEOBE-20 — release candidate audit: LICENSE-APACHE, README, CI gate, clippy/fmt
 - [ ] promote: `gh repo create nixpt/pheobe` + push `main` + hand-tag `v0.1.0` (captain's call)
 - [ ] decide whether the `/workspace/external/…` provenance citations in `adopt/` and
-      `knowledge/` should ship in the crate as-is (PHEOBE-19 non-goal, flagged)
+      `knowledge/` should ship in the crate as-is (PHEOBE-20 non-goal, flagged)
