@@ -52,7 +52,7 @@ struct PathGuard {
 
 impl PathGuard {
     fn with_dir(dir: &Path) -> Self {
-        let lock = PATH_LOCK.lock().unwrap();
+        let lock = PATH_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let orig_path = std::env::var("PATH").unwrap_or_default();
         unsafe { std::env::set_var("PATH", format!("{}:{orig_path}", dir.display())) };
         Self {
@@ -62,7 +62,7 @@ impl PathGuard {
     }
 
     fn without_backends() -> Self {
-        let lock = PATH_LOCK.lock().unwrap();
+        let lock = PATH_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let names = &["polydex", "crush-symbols", "code-atlas"];
         let filtered: Vec<PathBuf> = std::env::split_paths(&orig_path)

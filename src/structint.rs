@@ -358,7 +358,7 @@ esac
 
     #[test]
     fn index_status_parses_fresh_and_stale_json() {
-        let _lock = PATH_LOCK.lock().unwrap();
+        let _lock = PATH_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let dir = scratch("fresh");
         fake_polydex(&dir);
         let real_path = std::env::var("PATH").unwrap_or_default();
@@ -371,7 +371,7 @@ esac
 
     #[test]
     fn stale_index_drift_surfaces_files() {
-        let _lock = PATH_LOCK.lock().unwrap();
+        let _lock = PATH_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let dir = scratch("stale");
         let body = r#"echo '{"exists":true,"freshness":{"new_files":["src/lib.rs"],"modified_files":[],"deleted_files":[]}}'"#;
         fake_bin(&dir, "polydex", body);
@@ -394,7 +394,7 @@ esac
     /// the fake records argv + cwd proving the exact subcommand shapes.
     #[test]
     fn wrapper_shapes_and_cwd_reach_the_backend() {
-        let _lock = PATH_LOCK.lock().unwrap();
+        let _lock = PATH_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let dir = scratch("wrap");
         let (bin, cap) = fake_polydex(&dir);
         let real_path = std::env::var("PATH").unwrap_or_default();
@@ -430,7 +430,7 @@ esac
 
     #[test]
     fn stale_wrapper_returns_the_fallback_note_not_silent_success() {
-        let _lock = PATH_LOCK.lock().unwrap();
+        let _lock = PATH_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let dir = scratch("stale-wrap");
         // status always reports stale (modified files present); reads never serve
         let body = r#"if [ "$1" = status ]; then echo '{"exists":true,"freshness":{"modified_files":["src/lib.rs"],"new_files":[],"deleted_files":[]}}'; else echo 'should-not-serve'; fi"#;
@@ -455,7 +455,7 @@ esac
 
     #[test]
     fn orient_brief_empty_when_backend_absent() {
-        let _lock = PATH_LOCK.lock().unwrap();
+        let _lock = PATH_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let dir = scratch("no-backend");
         let real_path = std::env::var("PATH").unwrap_or_default();
         // PATH with no polydex: use a directory with nothing in it
@@ -473,7 +473,7 @@ esac
 
     #[test]
     fn orient_brief_lists_languages_and_hotspots_when_fresh() {
-        let _lock = PATH_LOCK.lock().unwrap();
+        let _lock = PATH_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let dir = scratch("orient");
         fake_polydex(&dir);
         let real_path = std::env::var("PATH").unwrap_or_default();

@@ -5,7 +5,12 @@
 passed on retry. Reproduced once on the foreman box while verifying PHEOBE-25
 (`worker_codex::tests::codex_failed_run_surfaces_the_stderr_tail`, panic at
 `worker_codex.rs:377`; green alone and on 3 immediate re-runs).
-**Severity:** P4 — flake, no wrong behaviour; costs a retry.
+**Severity:** P3 (was P4) — one ETXTBSY panic inside the PATH-lock test family
+(`structint` + `tests/structural`) poisoned the shared `PATH_LOCK`, and 10 tests
+failed in one run on the foreman box while merging PHEOBE-35 (2026-09-16); green
+on two immediate re-runs. The lock now tolerates poisoning (`unwrap_or_else(|e|
+e.into_inner())`, the `claude_env_lock` pattern), so the blast radius is back to
+one test — the root race remains.
 
 ## Mechanism
 
