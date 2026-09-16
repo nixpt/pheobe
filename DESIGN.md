@@ -816,6 +816,66 @@ Degradation rule unchanged: host can't provide the tier →
 (`Worker` trait reuse from PHEOBE-4), plus `pheobe adopt claude` extended
 to emit the subagent def + the SDK-snippet variant.
 
+## Cursor integration (source-grounded; worker-shaped only)
+
+Reference material on disk: `/workspace/external/cursor-sdks` —
+`@cursor/sdk` 1.0.31 (ts-src, unpacked from npm) + `cursor-sdk` Python
+1.0.31 (whl + unpacked src) + both doc sources (`docs-*.md`).
+
+**The structural difference from claude/opencode:** Cursor has **no
+completions endpoint at all** — their own docs state "the Cursor SDK is
+an agent SDK, not a standalone model-inference or chat-completions API";
+Router (`auto-smart` + `optimize_for`) exists only for agent runs. So
+there is no "pheobe as client of cursor models" surface: cursor is
+worker-shaped only. Everything routes through the same two runtimes:
+
+| runtime | what it is |
+|---|---|
+| local | agent loop **inline in your Node process** (TS) or via a vendored `cursor-sdk-bridge` Node process (Python wheel ships one, bundled node included); files on local disk; model always Cursor-hosted |
+| cloud | Cursor-hosted VM, repo cloned in, survives caller disconnect (`bc-<uuid>` agents, `auto_create_pr`) — pheobe's worktree stage is moot there; the contract still applies |
+
+Source facts that shape the design (from the unpacked SDKs + docs):
+
+- **`Agent.prompt()` is pheobe's `Worker` trait verbatim** — one-shot:
+  create agent → send → wait → dispose. Local persistence (per-workspace
+  store), `Agent.resume()` by id, `run.cancel()`, `run.status`
+  running/finished/error/cancelled/expired.
+- **Real dollar budgets.** `agent.getUsage()` returns billed token usage
+  *and dollar cost* — pheobe's `budget.max_usd` becomes actually
+  enforceable on cursor runs without any `PHEOBE_USD_PER_MTOK` price
+  signal. The first host where the USD guard is real rather than
+  advisory.
+- **Steering delivers the aging ladder to a delegated engine.**
+  `run.steer(text)` injects into a *running* turn (local only; result
+  `complete_delivered` | `revert_to_followup`). Cursor is the one host
+  where pheobe's warn/narrow injects can reach a delegated engine
+  mid-run instead of only wrapping the black box.
+- **Modes map to loop stages**: `mode: "plan"` (explore/plan first) then
+  `mode: "agent"` mirrors pheobe's plan → implement boundary.
+- **Subagents = `local.agents: Record<string, AgentDefinition>`**
+  (`{ description, prompt, model, mcpServers }`); the `task` tool gates
+  them, and disabling `task` prevents subagents entirely — no-recursion
+  again enforced at the host layer, third ecosystem in a row.
+- **Sandbox is first-party**: `local.sandboxOptions.enabled: true` (the
+  per-platform `@cursor/sdk-<os>-<arch>` sandbox helper binaries),
+  `beforeShellExecution` / `preToolUse` hooks as the policy tier;
+  headless default auto-approves tool calls, no human in the loop.
+- **`systemPrompt` replacement** (local only, per-account) — pheobe's
+  host-mode kit can ride it, but the safer default is the subagent def
+  (subagents keep their own prompts).
+
+### Ticket
+
+**PHEOBE-6** (planning board): implement the cursor worker adapter
+(PHEOBE-4's `Worker` trait): `PHEOBE_PROVIDER=cursor` (TS via a small
+node shim, or Python via subprocess script — the wheel is the easier
+subprocess), `CURSOR_API_KEY` auth, `mode="agent"`, sandbox tier =
+`local.sandboxOptions.enabled` (strict/moderate) vs hooks (free),
+`budget.max_usd` enforced from `getUsage()` (real dollars), aging
+injects delivered via `run.steer()` at warn/narrow, `run.cancel()` on
+expiry. Plus `pheobe adopt cursor` emitting the `local.agents` def +
+hook config snippet.
+
 ## Persona & skills
 
 The persona is not invented — it is mined from the people who built the
