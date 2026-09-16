@@ -559,6 +559,7 @@ fn provider_registry_resolves_or_errors_clearly() {
     assert!(matches!(worker_from_env(""), Ok(None)), "empty = the default loop");
     assert!(matches!(worker_from_env("claude"), Ok(Some(_))), "claude = its adapter (PHEOBE-5)");
     assert!(matches!(worker_from_env("cursor"), Ok(Some(_))), "cursor = its adapter (PHEOBE-6)");
+    assert!(matches!(worker_from_env("kimi"), Ok(Some(_))), "kimi = its adapter (PHEOBE-8)");
     let err = match worker_from_env("definitely-not-a-provider") {
         Err(e) => e,
         Ok(_) => panic!("unknown provider must error"),
