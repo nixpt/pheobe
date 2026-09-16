@@ -23,3 +23,4 @@ and are listed here so the board is the one place to look.
 - [x] PHEOBE-9 — the `Worker` trait + `PHEOBE_PROVIDER` dispatcher (`agent/nixp/PHEOBE-9-worker-trait`)
 - [ ] adoption kits verified against a real harness each
 - [ ] host mode exit gate (`pheobe verify`)
+- [x] PHEOBE-10 — barn hardening: structured test parsing, format-on-write, checkpoints, depends_on validation (`agent/nixp/PHEOBE-10-barn`, 29 tests green)

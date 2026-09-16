@@ -6,12 +6,15 @@
 
 pub mod agent;
 pub mod aging;
+pub mod checkpoint;
+pub mod fmt;
 pub mod knowledge;
 pub mod learn;
 pub mod llm;
 pub mod plan;
 pub mod report;
 pub mod task;
+pub mod testparse;
 pub mod tools;
 pub mod verify;
 pub mod worker;

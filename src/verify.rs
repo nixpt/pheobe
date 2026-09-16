@@ -7,7 +7,8 @@ use anyhow::Result;
 use std::path::Path;
 use std::process::Command;
 
-/// Run the done_when gate. Returns test evidence.
+/// Run the done_when gate. Returns test evidence (raw excerpt + structured
+/// parse when the output matched a known runner).
 pub fn run_done_when(task: &Task, cwd: &Path) -> Result<TestEvidence> {
     match &task.done_when {
         DoneWhen::Command { run, expect_exit } => {
@@ -22,10 +23,12 @@ pub fn run_done_when(task: &Task, cwd: &Path) -> Result<TestEvidence> {
                 String::from_utf8_lossy(&out.stderr)
             );
             let excerpt: String = combined.lines().rev().take(20).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join("\n");
+            let parsed = crate::testparse::parse(&combined);
             Ok(TestEvidence {
                 ran: run.clone(),
                 passed,
                 output_excerpt: Some(excerpt),
+                parsed,
             })
         }
     }
