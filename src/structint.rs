@@ -388,7 +388,7 @@ esac
         let cap = std::fs::read_to_string(&cap).unwrap();
         let lines: Vec<&str> = cap.lines().collect();
         assert!(
-            lines.iter().any(|l| *l == "skeleton"),
+            lines.contains(&"skeleton"),
             "argv recorded, got: {lines:?}"
         );
         // every recorded invocation ran with cwd = worktree

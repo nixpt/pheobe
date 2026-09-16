@@ -65,16 +65,12 @@ pub async fn serve_stdio() -> anyhow::Result<()> {
 
 /// The sessionful ACP server. Each session carries the worktree the dispatch
 /// will cook in — session/new's cwd, validated to be inside a git repo.
+#[derive(Default)]
 struct SessionStore {
     /// Maps ACP session id → the repo path for that session's run.
     sessions: std::collections::HashMap<String, String>,
 }
 
-impl Default for SessionStore {
-    fn default() -> Self {
-        SessionStore { sessions: Default::default() }
-    }
-}
 
 pub async fn serve(transport: impl agent_client_protocol::ConnectTo<Agent> + 'static) -> anyhow::Result<()> {
     let store = std::sync::Arc::new(tokio::sync::Mutex::new(SessionStore::default()));
@@ -262,7 +258,7 @@ mod tests {
         /// drive it from the client side with the crate's own `Client` role.
         async fn drive<F, T>(self, main: F) -> Result<T, agent_client_protocol::Error>
         where
-            F: for<'a> AsyncFnOnce(ConnectionTo<Agent>) -> Result<T, agent_client_protocol::Error>,
+            F: AsyncFnOnce(ConnectionTo<Agent>) -> Result<T, agent_client_protocol::Error>,
             T: Send + 'static,
         {
             let server = tokio::spawn(serve(self.server));
@@ -323,8 +319,7 @@ mod tests {
                     .block_task()
                     .await?
                     .session_id;
-                let session = cx
-                    .build_session(&cwd)
+                cx.build_session(&cwd)
                     .block_task()
                     .run_until(async |mut session| {
                         session
@@ -360,7 +355,6 @@ mod tests {
                         Ok::<_, agent_client_protocol::Error>(())
                     })
                     .await?;
-                let _ = &session;
                 Ok(())
             })
             .await;

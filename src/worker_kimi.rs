@@ -347,9 +347,8 @@ mod tests {
     #[test]
     fn kimi_content_parts_concat_as_final_text() {
         let dir = scratch("parts");
-        let body = format!(
-            "printf '%s\\n' '{{\"content\":[{{\"text\":\"part one\"}},{{\"text\":\"part two\"}}]}}'"
-        );
+        let body = "printf '%s\\n' '{\"content\":[{\"text\":\"part one\"},{\"text\":\"part two\"}]}'"
+            .to_string();
         let script = fake_kimi(&dir, "kimi", &body);
         with_kimi_bin(&script, || {
             let out = KimiWorker.run("x", &dir).unwrap();

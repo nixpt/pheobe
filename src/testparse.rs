@@ -62,8 +62,8 @@ fn parse_cargo(text: &str) -> Option<TestReport> {
     // "test result: ok. 42 passed; 0 failed; 0 ignored; ..."
     // "test result: FAILED. 10 passed; 1 failed; ..."
     let line = text.lines().find(|l| l.contains("test result:"))?;
-    let passed = count_in(&line, "passed")?;
-    let failed = count_in(&line, "failed").unwrap_or(0);
+    let passed = count_in(line, "passed")?;
+    let failed = count_in(line, "failed").unwrap_or(0);
     let total = passed + failed;
 
     let mut failures: Vec<Failure> = Vec::new();
@@ -122,9 +122,9 @@ fn parse_cargo(text: &str) -> Option<TestReport> {
 fn parse_jest(text: &str) -> Option<TestReport> {
     // "Tests:       2 failed, 14 passed, 16 total"
     let line = text.lines().find(|l| l.trim_start().starts_with("Tests:"))?;
-    let passed = count_in(&line, "passed").unwrap_or(0);
-    let failed = count_in(&line, "failed").unwrap_or(0);
-    let total = count_in(&line, "total").unwrap_or(passed + failed);
+    let passed = count_in(line, "passed").unwrap_or(0);
+    let failed = count_in(line, "failed").unwrap_or(0);
+    let total = count_in(line, "total").unwrap_or(passed + failed);
 
     let mut failures: Vec<Failure> = Vec::new();
     for l in text.lines() {
@@ -149,10 +149,10 @@ fn parse_pytest(text: &str) -> Option<TestReport> {
         l.contains(" in ")
             && ["passed", "failed", "error", "skipped"].iter().any(|w| count_in(l, w).is_some())
     })?;
-    let passed = count_in(&line, "passed").unwrap_or(0);
-    let failed = count_in(&line, "failed").unwrap_or(0);
-    let errors = count_in(&line, "error").unwrap_or(0);
-    let skipped = count_in(&line, "skipped").unwrap_or(0);
+    let passed = count_in(line, "passed").unwrap_or(0);
+    let failed = count_in(line, "failed").unwrap_or(0);
+    let errors = count_in(line, "error").unwrap_or(0);
+    let skipped = count_in(line, "skipped").unwrap_or(0);
     let total = passed + failed + errors + skipped;
 
     let mut failures: Vec<Failure> = Vec::new();
@@ -199,10 +199,10 @@ fn parse_go(text: &str) -> Option<TestReport> {
             saw_marker = true;
             passed += 1;
             last_marker = i;
-        } else if t.starts_with("--- FAIL: ") {
+        } else if let Some(rest) = t.strip_prefix("--- FAIL: ") {
             saw_marker = true;
             failed += 1;
-            let name = t["--- FAIL: ".len()..].split_whitespace().next().unwrap_or("").to_string();
+            let name = rest.split_whitespace().next().unwrap_or("").to_string();
             // log lines (with the file ref) precede the FAIL marker — search
             // back to the previous marker
             let file = lines[last_marker..i]

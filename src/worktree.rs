@@ -91,13 +91,11 @@ pub fn status_dirty(wt: &Path) -> Result<bool> {
     // and must never count as "the model changed something" — a run whose
     // only diff is `.pheobe/plan.json` did no work and has nothing to commit.
     Ok(status_porcelain(wt)?
-        .into_iter()
-        .filter(|line| {
+        .into_iter().find(|line| {
             porcelain_path(line)
                 .map(|p| !(p == ".pheobe" || p.starts_with(".pheobe/")))
                 .unwrap_or(true)
         })
-        .next()
         .is_some())
 }
 

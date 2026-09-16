@@ -133,7 +133,7 @@ pub fn run(
         }),
         None => serde_json::json!({
             "ok": false,
-            "summary": history.iter().filter_map(|m| m.content.as_deref()).last().unwrap_or("").to_string(),
+            "summary": history.iter().filter_map(|m| m.content.as_deref()).next_back().unwrap_or("").to_string(),
             "blocked": format!("max_turns ({}) reached without handoff", cfg.max_turns),
             "doubts": [],
             "next_steps": [],
