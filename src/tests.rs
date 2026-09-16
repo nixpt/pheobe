@@ -24,7 +24,32 @@ mod structural;
 mod update;
 mod worker_route;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+/// Write an executable `#!/bin/sh` shim at `dir/name` without ETXTBSY.
+///
+/// The dest inode is never open for write: we write+chmod a sibling tmp
+/// and rename onto `name`. A parallel test's `fork` can inherit a write fd
+/// on the tmp; `execve` of the dest then succeeds (issue 10).
+///
+/// `body` is the script after the shebang, unless it already starts with `#!`.
+pub(crate) fn write_shim(dir: &Path, name: &str, body: &str) -> PathBuf {
+    let path = dir.join(name);
+    let tmp = dir.join(format!(".{name}.{}.tmp", std::process::id()));
+    let script = if body.starts_with("#!") {
+        body.to_string()
+    } else {
+        format!("#!/bin/sh\n{body}")
+    };
+    std::fs::write(&tmp, script).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    std::fs::rename(&tmp, &path).unwrap();
+    path
+}
 
 fn run_git(wt: &Path, args: &[&str]) -> String {
     let out = std::process::Command::new("git")
@@ -67,4 +92,20 @@ fn del_env(k: &str) {
 
 fn worker_task() -> crate::task::Task {
     serde_json::from_str(r#"{"task":"x","done_when":{"type":"command","run":"true"}}"#).unwrap()
+}
+
+#[test]
+fn write_shim_dest_is_executable() {
+    let dir = std::env::temp_dir().join(format!("pheobe-shim-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let p = write_shim(&dir, "hello", "printf hi\n");
+    let out = std::process::Command::new(&p).output().unwrap();
+    assert!(
+        out.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "hi");
+    std::fs::remove_dir_all(&dir).ok();
 }

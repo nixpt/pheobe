@@ -142,13 +142,11 @@ mod tests {
 
         // formatter failure = doubt note, never a tool failure: fake prettier
         std::fs::create_dir_all(dir.join("node_modules/.bin")).unwrap();
-        let fake = dir.join("node_modules/.bin/prettier");
-        std::fs::write(&fake, "#!/bin/sh\necho 'boom' >&2\nexit 3\n").unwrap();
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
-        }
+        crate::tests::write_shim(
+            &dir.join("node_modules/.bin"),
+            "prettier",
+            "echo 'boom' >&2\nexit 3\n",
+        );
         let note = format_on_write(&dir, Path::new("web/app.js")).unwrap();
         assert!(
             note.contains("doubt") && note.contains("prettier") && note.contains("boom"),

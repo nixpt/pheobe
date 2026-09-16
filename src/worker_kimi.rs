@@ -67,7 +67,7 @@ impl Worker for KimiWorker {
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
 
-        let mut child = cmd.spawn().with_context(|| {
+        let mut child = crate::worker::spawn_retry(&mut cmd).with_context(|| {
             format!(
                 "kimi worker: failed to spawn '{bin}' (is the kimi binary on PATH? \
                  set PHEOBE_KIMI_BIN to override)"
@@ -236,16 +236,7 @@ mod tests {
     }
 
     fn fake_kimi(dir: &std::path::Path, name: &str, body: &str) -> std::path::PathBuf {
-        let path = dir.join(name);
-        std::fs::write(&path, format!("#!/bin/sh\n{body}")).unwrap();
-        let mut perms = std::fs::metadata(&path).unwrap().permissions();
-        #[allow(clippy::permissions_set_readonly_false)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            perms.set_mode(0o755);
-        }
-        std::fs::set_permissions(&path, perms).unwrap();
-        path
+        crate::tests::write_shim(dir, name, body)
     }
 
     fn capture_kimi(dir: &std::path::Path, out: &str) -> (std::path::PathBuf, std::path::PathBuf) {

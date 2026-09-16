@@ -13,7 +13,9 @@
 use anyhow::{bail, Result};
 use serde_json::Value;
 use std::path::Path;
+use std::process::{Child, Command, Output};
 use std::sync::Arc;
+use std::time::Duration;
 
 /// What a worker engine reports back from one whole run.
 #[derive(Debug, Clone)]
@@ -108,5 +110,50 @@ pub fn worker_from_env(provider: &str) -> Result<Option<Arc<dyn Worker>>> {
                 )
             }
         },
+    }
+}
+
+/// Linux/macOS `ETXTBSY` — exec of a file still open for write (issue 10).
+pub(crate) fn is_etxtbsy(err: &std::io::Error) -> bool {
+    err.raw_os_error() == Some(26)
+}
+
+/// `Command::spawn`, retrying a short backoff on ETXTBSY so a parallel
+/// test's leftover write-fd doesn't fail the suite (issue 10).
+pub(crate) fn spawn_retry(cmd: &mut Command) -> std::io::Result<Child> {
+    let mut wait = Duration::from_millis(2);
+    for attempt in 0..8 {
+        match cmd.spawn() {
+            Err(e) if is_etxtbsy(&e) && attempt + 1 < 8 => {
+                std::thread::sleep(wait);
+                wait = wait.saturating_mul(2);
+            }
+            other => return other,
+        }
+    }
+    cmd.spawn()
+}
+
+/// `Command::output` with the same ETXTBSY backoff as [`spawn_retry`].
+pub(crate) fn output_retry(cmd: &mut Command) -> std::io::Result<Output> {
+    let mut wait = Duration::from_millis(2);
+    for attempt in 0..8 {
+        match cmd.output() {
+            Err(e) if is_etxtbsy(&e) && attempt + 1 < 8 => {
+                std::thread::sleep(wait);
+                wait = wait.saturating_mul(2);
+            }
+            other => return other,
+        }
+    }
+    cmd.output()
+}
+
+#[cfg(test)]
+mod etxtbsy_tests {
+    #[test]
+    fn errno_26_is_etxtbsy() {
+        assert!(super::is_etxtbsy(&std::io::Error::from_raw_os_error(26)));
+        assert!(!super::is_etxtbsy(&std::io::Error::from_raw_os_error(2)));
     }
 }

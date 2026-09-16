@@ -20,7 +20,7 @@ dcp: DCP/1.0
 
 ## Build / Test
 
-- `cargo test` (148 tests; adapter tests exec shell shims — issue 10 ETXTBSY flake under parallel load), `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check`, `cargo package --no-verify`. CI (`ci.yml`) runs exactly those; `release.yml` runs them again before any version bump.
+- `cargo test` (adapter tests exec shell shims via `write_shim` tmp+rename so a parallel fork cannot ETXTBSY the dest), `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check`, `cargo package --no-verify`. CI (`ci.yml`) runs exactly those; `release.yml` runs them again before any version bump.
 - Version moves with the work: a `feat:` merge to `main` mints a minor, `fix:` a patch, `!`/`BREAKING CHANGE` a major, everything else nothing; the tag is then published to crates.io by `publish.yml` over OIDC. Never hand-edit `version` in `Cargo.toml` (`docs/RELEASING.md`).
 - No path or git deps — the crate must build from its own tarball (`cargo publish --dry-run`).
 

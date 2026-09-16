@@ -302,13 +302,7 @@ pub(crate) mod tests {
     }
 
     fn fake_bin(dir: &Path, name: &str, body: &str) -> PathBuf {
-        let path = dir.join(name);
-        std::fs::write(&path, format!("#!/bin/sh\n{body}")).unwrap();
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = std::fs::metadata(&path).unwrap().permissions();
-        perms.set_mode(0o755);
-        std::fs::set_permissions(&path, perms).unwrap();
-        path
+        crate::tests::write_shim(dir, name, body)
     }
 
     /// A fake polydex that appends each argv to `capture` and prints a

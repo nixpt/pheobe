@@ -45,9 +45,7 @@ cargo test
 cargo package --no-verify
 ```
 
-That is exactly what `ci.yml` runs. Adapter tests exec small shell shims; under
-heavy parallel load one may hit `ETXTBSY` (issue 10) — re-run before assuming
-a real failure.
+That is exactly what `ci.yml` runs.
 
 ## The contract is the product
 

@@ -5,12 +5,8 @@
 passed on retry. Reproduced once on the foreman box while verifying PHEOBE-25
 (`worker_codex::tests::codex_failed_run_surfaces_the_stderr_tail`, panic at
 `worker_codex.rs:377`; green alone and on 3 immediate re-runs).
-**Severity:** P3 (was P4) — one ETXTBSY panic inside the PATH-lock test family
-(`structint` + `tests/structural`) poisoned the shared `PATH_LOCK`, and 10 tests
-failed in one run on the foreman box while merging PHEOBE-35 (2026-09-16); green
-on two immediate re-runs. The lock now tolerates poisoning (`unwrap_or_else(|e|
-e.into_inner())`, the `claude_env_lock` pattern), so the blast radius is back to
-one test — the root race remains.
+**Status:** Done (PHEOBE-37)
+**Severity:** P3 (was P4) — closed.
 
 ## Mechanism
 
@@ -28,3 +24,9 @@ the first spawn on `ErrorKind::ExecutableFileBusy` with a short backoff —
 or, cheaper, spawns the shim through `sh <path>` (the shell opens the
 script for reading; no exec of the written inode). Consolidating the five
 copies of the shim writer into that helper is the LOC-budget move anyway.
+
+## Resolution
+
+PHEOBE-37: `write_shim` writes+chmods a sibling tmp and renames onto the dest
+so the dest inode is never open for write. Worker `spawn_retry` /
+`output_retry` back off on errno 26. Sandbox `PATH_LOCK` uses `into_inner`.

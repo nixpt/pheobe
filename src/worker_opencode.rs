@@ -93,11 +93,9 @@ impl Worker for OpenCodeWorker {
 
         let mut cmd = std::process::Command::new(&self.bin);
         cmd.args(&args).current_dir(worktree);
-        let mut child = match cmd
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .spawn()
-        {
+        cmd.stdout(std::process::Stdio::piped());
+        cmd.stderr(std::process::Stdio::piped());
+        let mut child = match crate::worker::spawn_retry(&mut cmd) {
             Ok(c) => c,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => bail!(
                 "opencode worker: binary '{}' not found on PATH — set PHEOBE_OPENCODE_BIN \

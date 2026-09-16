@@ -99,24 +99,23 @@ impl Worker for CodexWorker {
         if self.tier == "strict" {
             prompt.push_str(STRICT_NOTE);
         }
-        let out = Command::new(&self.bin)
-            .args([
-                "exec",
-                "--json",
-                "--skip-git-repo-check",
-                "--sandbox",
-                sandbox,
-            ])
-            .arg(&prompt)
-            .current_dir(worktree)
-            .output()
-            .with_context(|| {
-                format!(
-                    "failed to spawn '{} exec' — is the codex binary on PATH \
+        let mut cmd = Command::new(&self.bin);
+        cmd.args([
+            "exec",
+            "--json",
+            "--skip-git-repo-check",
+            "--sandbox",
+            sandbox,
+        ])
+        .arg(&prompt)
+        .current_dir(worktree);
+        let out = crate::worker::output_retry(&mut cmd).with_context(|| {
+            format!(
+                "failed to spawn '{} exec' — is the codex binary on PATH \
                      (or point PHEOBE_CODEX_BIN at it)?",
-                    self.bin
-                )
-            })?;
+                self.bin
+            )
+        })?;
         if !out.status.success() {
             let stderr = String::from_utf8_lossy(&out.stderr);
             bail!("codex exec exited with {}: {}", out.status, stderr.trim());
@@ -205,16 +204,7 @@ mod tests {
     }
 
     fn fake_codex(dir: &Path, name: &str, body: &str) -> std::path::PathBuf {
-        let path = dir.join(name);
-        std::fs::write(&path, format!("#!/bin/sh\n{body}")).unwrap();
-        let mut perms = std::fs::metadata(&path).unwrap().permissions();
-        #[allow(clippy::permissions_set_readonly_false)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            perms.set_mode(0o755);
-        }
-        std::fs::set_permissions(&path, perms).unwrap();
-        path
+        crate::tests::write_shim(dir, name, body)
     }
 
     fn outcome_dir(dir: &Path) -> WorkerOutcome {

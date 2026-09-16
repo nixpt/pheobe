@@ -89,7 +89,7 @@ impl Worker for CursorWorker {
         cmd.stdout(std::process::Stdio::piped());
         cmd.stderr(std::process::Stdio::piped());
 
-        let mut child = cmd.spawn().with_context(|| {
+        let mut child = crate::worker::spawn_retry(&mut cmd).with_context(|| {
             format!(
                 "cursor worker: failed to spawn '{bin}' (is the cursor-agent binary on PATH? \
                  set PHEOBE_CURSOR_BIN to override)"
