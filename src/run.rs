@@ -35,7 +35,7 @@ pub fn run_task(
     let branch = branch
         .map(|b| b.to_string())
         .or(task.branch.clone())
-        .unwrap_or_else(|| format!("pheobe/{}", task_slug(&task.task)));
+        .unwrap_or_else(|| default_branch(&task.task));
     let task_id = task_slug(&task.task);
 
     if !task.worktree && Path::new(&repo).join(".git").is_dir() {
@@ -45,17 +45,41 @@ pub fn run_task(
         );
     }
     let (wt, branch) = worktree::provision(&repo, &branch)?;
-    let base_sha = worktree::head_sha(&wt)?;
+    let result = run_after_provision(
+        task,
+        &wt,
+        &branch,
+        &task_id,
+        &repo,
+        &sandbox_tier_name,
+        progress,
+    );
+    if result.is_err() && !worktree::keep_requested() {
+        let _ = worktree::teardown(&repo, &wt, &branch);
+    }
+    result
+}
+
+fn run_after_provision(
+    task: &task::Task,
+    wt: &Path,
+    branch: &str,
+    task_id: &str,
+    repo: &Path,
+    sandbox_tier_name: &str,
+    progress: &dyn Fn(&str),
+) -> Result<report::HandoffReport> {
+    let base_sha = worktree::head_sha(wt)?;
     progress(&format!("🍳 worktree: {}  branch: {branch}", wt.display()));
     let repo_str = repo.display().to_string();
-    let session = learn::begin_session(&repo, &task.task)?;
+    let session = learn::begin_session(repo, &task.task)?;
 
     // orient: knowledge drive brief (repo-local + global drives) + learned nudges
-    let entries = knowledge::load_all(Some(&wt))?;
+    let entries = knowledge::load_all(Some(wt))?;
     let mut brief = knowledge::brief(&entries);
     // structural read brief (polydex, fresh index) — empty when absent/stale;
     // skip-don't-fail, same posture as the knowledge drive
-    let structural = structint::orient_brief(&wt);
+    let structural = structint::orient_brief(wt);
     if !structural.is_empty() {
         brief.push_str(&structural);
     }
@@ -74,7 +98,7 @@ pub fn run_task(
 
     // plan file seeded; the model refines it through the loop
     plan::save(
-        &wt,
+        wt,
         &plan::Plan {
             task: task.task.clone(),
             steps: vec![],
@@ -100,17 +124,17 @@ pub fn run_task(
             .and_then(|v| v.parse().ok()),
     };
     let outcome = match worker::worker_from_env(&provider_name)? {
-        Some(w) => agent::run_worker(w.as_ref(), task, &wt, &task_id, &brief, &nudges, &cfg)?,
+        Some(w) => agent::run_worker(w.as_ref(), task, wt, task_id, &brief, &nudges, &cfg)?,
         None => {
             let provider = llm::OpenAi::from_env()?;
-            agent::run(&provider, task, &wt, &task_id, &brief, &nudges, &cfg)?
+            agent::run(&provider, task, wt, task_id, &brief, &nudges, &cfg)?
         }
     };
 
     // mechanical gates run after the loop and have the final word over the model
-    let dirty = worktree::status_dirty(&wt)?;
+    let dirty = worktree::status_dirty(wt)?;
     if outcome.ok && dirty {
-        let (violations, byproducts) = worktree::check_allowlist(&wt, &task.paths_allow)?;
+        let (violations, byproducts) = worktree::check_allowlist(wt, &task.paths_allow)?;
         if !byproducts.is_empty() {
             progress(&format!(
                 "📝 bash-run byproducts (uncommitted, staged out): {}",
@@ -126,18 +150,18 @@ pub fn run_task(
             return Ok(rep);
         }
         worktree::commit(
-            &wt,
-            &task_id,
+            wt,
+            task_id,
             outcome.summary.as_deref().unwrap_or(&task.task),
             &task.paths_allow,
         )?;
     }
     // everything on the branch since provision — the engine's own commits
     // (worker route) and the gate's (issue 05)
-    let commits = worktree::commits_since(&wt, &base_sha)?;
+    let commits = worktree::commits_since(wt, &base_sha)?;
 
     let tests = if outcome.ok || dirty {
-        Some(verify::run_done_when(task, &wt)?)
+        Some(verify::run_done_when(task, wt)?)
     } else {
         None
     };
@@ -154,7 +178,7 @@ pub fn run_task(
     let rep = report::HandoffReport {
         ok,
         task: task.task.clone(),
-        branch: Some(branch),
+        branch: Some(branch.to_string()),
         worktree: Some(wt.display().to_string()),
         commits,
         tests,
@@ -172,9 +196,13 @@ pub fn run_task(
         }),
     };
     if task.push && ok {
-        worktree::push(&wt, rep.branch.clone().unwrap_or_default().as_str())?;
+        worktree::push(wt, rep.branch.clone().unwrap_or_default().as_str())?;
     }
     Ok(rep)
+}
+
+pub(crate) fn default_branch(task: &str) -> String {
+    format!("pheobe/{}", task_slug(task))
 }
 
 fn task_slug(t: &str) -> String {

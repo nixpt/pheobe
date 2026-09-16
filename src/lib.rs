@@ -9,6 +9,7 @@ pub mod agent;
 pub mod aging;
 pub mod checkpoint;
 pub mod fmt;
+pub mod host;
 pub mod knowledge;
 pub mod learn;
 pub mod llm;

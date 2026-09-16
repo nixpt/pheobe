@@ -57,5 +57,6 @@ What each field means, exactly:
 Standing rules across all hosts: one task per dispatch (`done_when`
 required — pheobe refuses vague asks at intake); pheobe never touches
 the source checkout (worktree ladder: kitchen > buckets > plain `git
-worktree add`); the report is the contract; scope is a contract
+worktree add`; host mode starts with `pheobe host setup` when the binary
+is on PATH); the report is the contract; scope is a contract
 (`paths_allow` only — "while I'm here" is a bug).

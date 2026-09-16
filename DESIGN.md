@@ -42,7 +42,7 @@ And from the side of the adopting harness:
 opencode agent def ┐
 claude subagent md ┤
 codex bash tool    ┤   self mode:  pheobe run --task <…> --json ──► handoff report
-bro synapse        ┤   host mode:  kit prompt runs on the adopter's own LLM; pheobe verify gates the exit
+bro synapse        ┤   host mode:  kit prompt on the adopter's LLM; pheobe host setup/finish own the kitchen
 any shell          ┘
 ```
 
@@ -265,16 +265,18 @@ supplies the contract. The adopt kits ship the loop as a **prompt protocol**:
 - the `done_when` verify step as a bash command the subagent must run
 - the handoff report as the exact JSON shape to end with
 
-The `pheobe` binary stays useful in host mode as a *verifier* only:
-`pheobe verify <task.json>` runs the `done_when` gate + path-allowlist check
-and exits 0/1 — so a host-mode subagent can end its turn with a mechanical
-check instead of vibes (the same "mayflies don't end on vibes" rule, one
-subcommand instead of a watcher loop).
+The `pheobe` binary owns the kitchen in host mode too (PHEOBE-26):
+`pheobe host setup <task.json>` provisions the worktree and seeds
+`.pheobe/plan.json`; `pheobe host finish <task.json> [--worktree PATH]`
+runs `done_when` + `paths_allow` and exits 0/1 with JSON. `pheobe verify`
+is the same exit gate against cwd (or `--worktree`) for kits that already
+call it. Early `pheobe run` failures after provision tear the empty
+worktree down unless `PHEOBE_KEEP_WORKTREE` is set.
 
 | | `self` | `host` |
 |---|---|---|
 | LLM provider | pheobe's endpoint | the adopting harness's model |
-| binary involvement | full loop | kit install + `pheobe verify` |
+| binary involvement | full loop | `host setup` / kit prompt / `host finish` |
 | fits | foreman/horse dispatch, mayfly `harness: "pheobe"`, plain CLI | opencode agents, claude subagents, codex, bro — anywhere the parent's model is already paying |
 
 Host mode is the cheap default for harness adopters (no endpoint config, one
@@ -1071,7 +1073,8 @@ Each kit is a thin wrapper over the JSON contract; none of them change it.
 
 ```
 pheobe run     <task.json|-|--task "…">  # the loop, self mode; JSON report on stdout
-pheobe verify  <task.json>               # done_when + allowlist gate; exit 0/1 (host mode)
+pheobe verify  <task.json>               # done_when + allowlist gate; exit 0/1
+pheobe host    setup|finish <task.json>  # host supervisor: provision kitchen, then exit gate
 pheobe ctx     list|brief|get|search|new|verify   # knowledge drive (borrowed from jokersquad ctx)
 pheobe acp     [--stdio]                 # ACP stdio server (bro/ACP adopters)
 pheobe adopt   <claude|opencode|codex|bro> [--host]  # print/install that harness's kit
