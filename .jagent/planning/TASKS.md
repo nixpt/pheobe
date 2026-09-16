@@ -1,26 +1,52 @@
 # TASKS — pheobe
 
-Planned work lives in `tickets/PHEOBE-N.md`; observed defects live in `../issues/NN-*.md`
-and are listed here so the board is the one place to look.
+Planned work lives in `tickets/PHEOBE-N-*.md`; observed defects live in `../issues/NN-*.md`
+and are listed here so the board is the one place to look. Ticket `Status` fields are the
+source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 
 ---
 
 ## P0 — Build & Core Health
 
-- [x] `cargo build --release` clean (verified 2026-09-16 at `c828bec`)
-- [ ] `cargo test` green (no test suite yet beyond `src/tests.rs`)
-- [ ] **issue 01** (`../issues/01-allowlist-off-by-one-first-porcelain-line.md`) — `check_allowlist` mangles the first `git status --porcelain` line (`M calc.py` → `alc.py`) because `worktree::run()` trims stdout; every run with a modified file is blocked at the gate.
-- [ ] **issue 02** (`../issues/02-own-state-dir-counted-as-allowlist-violation.md`) — `.pheobe/` and `done_when` byproducts (`__pycache__/`) are reported as allowlist violations.
-- [ ] **issue 03** (`../issues/03-existing-slug-branch-reused-silently.md`) — a pre-existing `pheobe/<slug>` branch is checked out silently instead of refusing or suffixing.
+- [x] `cargo build --release` clean
+- [x] `cargo test` green — 100 tests (`src/tests.rs` + per-module tests)
+- [x] `cargo clippy --all-targets -- -D warnings` + `cargo fmt --check` clean (PHEOBE-19)
+- [x] CI: `.github/workflows/ci.yml` (fmt, clippy, test, package) + release gate (PHEOBE-19)
+- [x] **issue 01** — allowlist off-by-one on the first porcelain line (Done, PHEOBE-3)
+- [x] **issue 02** — own state dir counted as an allowlist violation (Done, PHEOBE-3)
+- [x] **issue 03** — existing slug branch reused silently (Done, PHEOBE-3)
+- [ ] **issue 04** (`../issues/04-failed-model-run-leaves-empty-worktree.md`) — a run that
+      dies before the model turn (endpoint/auth failure) leaves an empty worktree + branch
+      behind. P3 hygiene.
 
 ## M0 — the loop exists
 
-- [x] PHEOBE-1 — the model turn (`c828bec`)
-- [ ] PHEOBE-2 — aging ladder + budget enforcement (`agent/nixp/PHEOBE-2`, unmerged)
+- [x] PHEOBE-1 — the model turn
+- [x] PHEOBE-2 — aging ladder + budget enforcement
+- [x] PHEOBE-3 — field defects 01–03
+- [x] PHEOBE-13 — live dogfood on fixed main (deepseek-v4-pro / kimi-k2.6 / glm-5.2, all `ok:true`)
 
 ## M1 — adoptable
 
-- [x] PHEOBE-9 — the `Worker` trait + `PHEOBE_PROVIDER` dispatcher (`agent/nixp/PHEOBE-9-worker-trait`)
-- [ ] adoption kits verified against a real harness each
-- [ ] host mode exit gate (`pheobe verify`)
-- [x] PHEOBE-10 — barn hardening: structured test parsing, format-on-write, checkpoints, depends_on validation (`agent/nixp/PHEOBE-10-barn`, 29 tests green)
+- [x] PHEOBE-9 — the `Worker` trait + `PHEOBE_PROVIDER` dispatcher
+- [x] PHEOBE-10 — barn hardening: structured test parsing, format-on-write, checkpoints
+- [x] PHEOBE-12 — knowledge drive seeding (language passports + fleet ctx entries)
+- [x] PHEOBE-15 — adopt-kit expansion + alignment
+- [x] PHEOBE-4 / 5 / 7 — opencode, claude, codex worker adapters (each live-smoked)
+- [x] PHEOBE-6 / 8 — cursor, kimi worker adapters
+- [x] host mode exit gate (`pheobe verify`)
+
+## M2 — isolation, structure, memory, transport
+
+- [x] PHEOBE-14 — sandboxing ladder (bwrap: strict / moderate / free)
+- [x] PHEOBE-11 — structural read/write ladder (polydex + code-atlas)
+- [x] PHEOBE-16 — `PHEOBE_MEMORY=none|local|host` trait swap
+- [x] PHEOBE-17 — `pheobe acp --stdio` (bro synapse dispatch peer)
+
+## W5 — release
+
+- [x] PHEOBE-18 — release posture: publish readiness, bump kit, `release.yml`
+- [x] PHEOBE-19 — release candidate audit: LICENSE-APACHE, README, CI gate, clippy/fmt
+- [ ] promote: `gh repo create nixpt/pheobe` + push `main` + hand-tag `v0.1.0` (captain's call)
+- [ ] decide whether the `/workspace/external/…` provenance citations in `adopt/` and
+      `knowledge/` should ship in the crate as-is (PHEOBE-19 non-goal, flagged)
