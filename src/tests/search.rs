@@ -378,8 +378,10 @@ fn grep_one_hit_per_file_and_truncation() {
 }
 
 #[test]
-fn search_walk_skips_files_starting_with_target_pinned_issue_11() {
+fn search_walk_includes_files_starting_with_target_issue_11() {
     let dir = scratch("issue-11-target");
+    std::fs::create_dir_all(dir.join("target-build")).unwrap();
+    std::fs::write(dir.join("target-build/sub.rs"), "MATCH_ME in skipped dir\n").unwrap();
     std::fs::write(dir.join("target.rs"), "MATCH_ME in target file\n").unwrap();
     std::fs::write(dir.join("targeting.py"), "MATCH_ME in targeting file\n").unwrap();
     std::fs::write(dir.join("valid.rs"), "MATCH_ME in valid file\n").unwrap();
@@ -388,12 +390,16 @@ fn search_walk_skips_files_starting_with_target_pinned_issue_11() {
     let ctx = test_ctx(&dir, &task);
     let tools = barn(&ctx);
 
-    // Pin current behavior: name.starts_with("target") skips both target.rs and targeting.py
+    // Issue 11 fix: target.rs and targeting.py are regular files, so they are searched;
+    // target-build is a directory starting with "target", so it is skipped.
     let res = dispatch(&tools, &ctx, "grep", &json!({"pattern": "MATCH_ME"})).unwrap();
-    assert_eq!(res, "valid.rs:1: MATCH_ME in valid file");
+    assert_eq!(
+        res,
+        "target.rs:1: MATCH_ME in target file\ntargeting.py:1: MATCH_ME in targeting file\nvalid.rs:1: MATCH_ME in valid file"
+    );
 
     let glob_res = dispatch(&tools, &ctx, "glob", &json!({"pattern": "*"})).unwrap();
-    assert_eq!(glob_res, "valid.rs");
+    assert_eq!(glob_res, "target.rs\ntargeting.py\nvalid.rs");
 
     std::fs::remove_dir_all(&dir).ok();
 }

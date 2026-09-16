@@ -87,6 +87,7 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 - [x] **PHEOBE-34** (`tickets/PHEOBE-34-cli-contract-tests.md`) — CLI contract tests driving the real binary; `main.rs` 80.91%, total 83.16% (was 79.31%).
 - [x] **PHEOBE-35** (`tickets/PHEOBE-35-search-tool-tests.md`) — barn `search`/`structural` tool tests; `tools/search.rs` 14% → ≥ 80%. Done (agy).
 - [x] PHEOBE-36 — `.jagent/` refreshed: PROJECT.md (public repo, crate, channel), STATE.md (M2 done, coverage, open items), ROADMAP (M0–M2 ✅, M3 current)
+- [x] **PHEOBE-37** (`tickets/PHEOBE-37-fix-search-walk-target-files.md`) — fix `search::walk` skipping files starting with "target" (issue 11). Done (agy).
 - coverage (cargo-llvm-cov, 2026-09-16, PHEOBE-34): 83.16% lines / 81.05% regions / 79.21% functions (`main.rs` 80.91%; was 79.31% / `main.rs` 0%)
 - [x] PHEOBE-31 — `pheobe doctor` prints compiled version vs crates.io / github tags
 - [x] PHEOBE-32 — `pheobe update` (`cargo install pheobe --locked --force`; git fallback) — shipped as 0.3.0
