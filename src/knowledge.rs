@@ -56,8 +56,8 @@ pub const SEED: &[(&str, &str)] = &[
     ),
 ];
 
-/// Write the seed corpus into `dir`. Existing files are kept unless `force`
-/// — a user's edits to a passport are theirs. Returns (written, kept).
+/// Seed the corpus into `dir` (idempotent: re-running with force=false keeps
+/// the user's existing entries — returns (written, kept)). The operation is
 pub fn seed(dir: &Path, force: bool) -> Result<(usize, usize)> {
     std::fs::create_dir_all(dir)?;
     let (mut written, mut kept) = (0, 0);
