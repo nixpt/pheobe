@@ -34,6 +34,12 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
       `target*` (Done, PHEOBE-37, agy)
 - [x] **issue 12** (`../issues/12-toolcall-missing-type-function-rejected-by-llama-cpp.md`) — echoed tool_calls lacked
       `type: function`; llama.cpp rejected turn 2 (Done, PHEOBE-39)
+- [ ] **issue 13** (`../issues/13-no-max-tokens-on-the-wire.md`) — `llm.rs` sends no `max_tokens`; the reply budget
+      is the server's default (unlimited on llama-server, **128** on `zorro serve`) — silent truncation of edit turns
+      on any conservative endpoint (found s500, vega)
+- [ ] **issue 14** (`../issues/14-text-reply-exit-mislabelled-as-max-turns.md`) — a model that answers in prose
+      (no tool call) exits the loop, and the report claims `max_turns (32) reached` at `turns: 3`; `blocked` sends
+      the adopter after budget when the problem is the endpoint (found s500, vega)
 - [x] kit drift found s457 (Done, PHEOBE-22): `adopt/claude/self-agent.md` runs `pheobe run <file> --json` (no such
       flag); DESIGN.md's kit table lists `adopt/claude/host/agents/pheobe.md` which does not exist
       (claude has no host kit — the opencode host protocol was used instead); `testparse` labels a
