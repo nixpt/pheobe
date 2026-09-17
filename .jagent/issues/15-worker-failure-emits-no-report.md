@@ -10,7 +10,9 @@ Two different failures, same shape:
   **empty**, exit 1, stderr `pheobe: kimi worker: 'kimi' exited with exit status: 1: …`.
 
 `run_worker` returns `Err`, `run_task` propagates it with `?`, and `main` prints the error and
-exits — the handoff report is never built. The self-mode loop has no such path: every exit there
+exits — the handoff report is never built. The same exit path is reachable from the finalizer
+(issue 17: `commits_since` failing on a re-rooted kitchen), so the fix belongs at `run_task`'s
+boundary, not in one adapter. The self-mode loop has no such path: every exit there
 (hard stop, max_turns, text reply) still produces `{ok: false, blocked: …}`.
 
 **Severity:** P2 — the README's first sentence about the report ("the only contract an adopter

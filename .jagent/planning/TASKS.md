@@ -47,6 +47,11 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
       write a linked worktree's gitdir (lives under the parent `.git`) so it can't commit; engine says `ok:false`,
       and `run_task` then skips pheobe's own commit gate despite a clean allowlist + passing `done_when`. Fix for
       the sandbox half verified with `writable_roots` (found s500, vega)
+- [ ] **issue 17** (`../issues/17-engine-git-init-clobbers-the-worktree-finalizer-dies.md`) — an engine ran
+      `git init --bare` inside the kitchen; the worktree's `.git` pointer was overwritten, the finalizer died on
+      `commits_since` (exit 128), no report; correct edits stranded. Kitchen identity must be pheobe's — refuse
+      `git init`/`clone`/`worktree` in the sandbox, verify the kitchen before diffing (found s500, vega, first
+      dispatch through the Claude adoption kit)
 - [x] kit drift found s457 (Done, PHEOBE-22): `adopt/claude/self-agent.md` runs `pheobe run <file> --json` (no such
       flag); DESIGN.md's kit table lists `adopt/claude/host/agents/pheobe.md` which does not exist
       (claude has no host kit — the opencode host protocol was used instead); `testparse` labels a
