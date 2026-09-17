@@ -164,3 +164,23 @@ fn learn_disabled_by_default_and_sessions_append_when_enabled() {
     std::fs::remove_dir_all(&dir).ok();
     unsafe { std::env::remove_var("PHEOBE_LEARNING_DIR") };
 }
+
+#[test]
+fn tool_calls_carry_type_function_on_the_wire() {
+    // issue 12: llama.cpp's OpenAI-compat server rejects an assistant message
+    // whose echoed tool_calls lack "type": "function"; lenient gateways hid it.
+    let tc = crate::llm::ToolCall {
+        id: "call_1".into(),
+        kind: "function".into(),
+        function: crate::llm::ToolFn {
+            name: "read".into(),
+            arguments: "{}".into(),
+        },
+    };
+    let v = serde_json::to_value(&tc).unwrap();
+    assert_eq!(v["type"], "function");
+    // and a response that omits it (some servers do) still deserialises
+    let back: crate::llm::ToolCall =
+        serde_json::from_str(r#"{"id":"x","function":{"name":"f","arguments":"{}"}}"#).unwrap();
+    assert_eq!(back.kind, "function");
+}
