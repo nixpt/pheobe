@@ -30,8 +30,10 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
       only from byproducts killed the run with an empty error (Done, PHEOBE-22).
 - [x] **issue 10** (`../issues/10-shim-exec-etxtbsy-race-in-parallel-tests.md`) — adapter tests can
       hit ETXTBSY when a parallel test forks mid-shim-write (Done, PHEOBE-37).
-- [ ] **issue 11** (`../issues/11-search-walk-skips-any-file-named-target.md`) — `search::walk` skips any *file* named
-      `target*`, not just build dirs (found + pinned in PHEOBE-35). **→ agy** (captain, 2026-09-16)
+- [x] **issue 11** (`../issues/11-search-walk-skips-any-file-named-target.md`) — `search::walk` skipped any *file* named
+      `target*` (Done, PHEOBE-37, agy)
+- [x] **issue 12** (`../issues/12-toolcall-missing-type-function-rejected-by-llama-cpp.md`) — echoed tool_calls lacked
+      `type: function`; llama.cpp rejected turn 2 (Done, PHEOBE-39)
 - [x] kit drift found s457 (Done, PHEOBE-22): `adopt/claude/self-agent.md` runs `pheobe run <file> --json` (no such
       flag); DESIGN.md's kit table lists `adopt/claude/host/agents/pheobe.md` which does not exist
       (claude has no host kit — the opencode host protocol was used instead); `testparse` labels a
@@ -89,6 +91,7 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 - [x] PHEOBE-36 — `.jagent/` refreshed: PROJECT.md (public repo, crate, channel), STATE.md (M2 done, coverage, open items), ROADMAP (M0–M2 ✅, M3 current)
 - [x] **PHEOBE-37** (`tickets/PHEOBE-37-fix-search-walk-target-files.md`) — fix `search::walk` skipping files starting with "target" (issue 11). Done (agy).
 - [x] **PHEOBE-38** (`tickets/PHEOBE-38-etxtbsy-shim-write.md`) — issue 10: `write_shim` tmp+rename + worker spawn retry on ETXTBSY.
+- [x] **PHEOBE-39** (`tickets/PHEOBE-39-toolcall-type.md`) — `tool_calls[].type = "function"` (issue 12); first self-mode run on a strict llama.cpp server (Kaggle GPU).
 - coverage (cargo-llvm-cov, 2026-09-16, PHEOBE-34): 83.16% lines / 81.05% regions / 79.21% functions (`main.rs` 80.91%; was 79.31% / `main.rs` 0%)
 - [x] PHEOBE-31 — `pheobe doctor` prints compiled version vs crates.io / github tags
 - [x] PHEOBE-32 — `pheobe update` (`cargo install pheobe --locked --force`; git fallback) — shipped as 0.3.0
