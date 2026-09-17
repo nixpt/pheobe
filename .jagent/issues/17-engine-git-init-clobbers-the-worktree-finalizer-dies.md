@@ -26,7 +26,14 @@ source repo's side the branch never moved and `652f5a9` is unreachable from the 
 The byproducts line is the tell — `HEAD`, `config`, `hooks/` are not bash byproducts, they are a
 repository — and it was printed as informational.
 
-**Severity:** P2 — a small model can do this on any task, and the two mechanical promises that
+**Reproduced (same session):** Qwen3.5-4B Q4_K_M in plain self mode on a multi-file task (new
+`stats.py` + `test_stats.py`), no adoption kit involved — `📝 bash-run byproducts … README.md,
+calc.py, test_calc.py` (tracked files listed as untracked is the same tell), `.git` a directory,
+commit `bea37b6` in the new root, `Invalid revision range`, exit 1, no report. The work was
+complete and met `done_when` by hand. That is 2 of the 4B's 3 multi-file self-mode runs today;
+gemma-4-12B on the identical task did not do it (`ok: true`, 7 turns).
+
+**Severity:** P1 (was P2) — a small model does this on ordinary tasks, and the two mechanical promises that
 matter most both break at once: the worktree stops being a worktree (the parent's branch never
 receives the work), and the adopter gets no report (issue 15's exit path, reached from the
 finalizer instead of an adapter). The edits themselves were correct and met `done_when` by hand;
