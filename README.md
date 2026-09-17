@@ -104,6 +104,14 @@ Everything is environment-driven; there is no config file.
 | `PHEOBE_KEEP_WORKTREE` | `1` / `true` / `yes` — leave a failed-run worktree on disk | unset (tear down on early `run` error) |
 | `PHEOBE_<PROVIDER>_BIN` / `_FLAGS` / `_TIMEOUT_SECS` | per-adapter binary, extra flags, wall-clock cap | adapter default |
 
+## Local models
+
+`scripts/pheobe-local` serves a model from your own registry
+(`~/.pheobe/models.d/NAME.env`) on llama-server or vLLM with the flags that
+make tool calling actually work, proves it (`smoke`: does the server render
+`tools`, does it return structured `tool_calls`), and hands `pheobe run` the
+env. `docs/LOCAL_MODELS.md` has the why, measured model notes, and sizing.
+
 ## Adoption kits
 
 `adopt/` holds one kit per harness, each a thin wrapper over the same JSON
