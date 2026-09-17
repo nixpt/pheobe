@@ -40,6 +40,13 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 - [ ] **issue 14** (`../issues/14-text-reply-exit-mislabelled-as-max-turns.md`) — a model that answers in prose
       (no tool call) exits the loop, and the report claims `max_turns (32) reached` at `turns: 3`; `blocked` sends
       the adopter after budget when the problem is the endpoint (found s500, vega)
+- [ ] **issue 15** (`../issues/15-worker-failure-emits-no-report.md`) — a worker adapter timeout or non-zero exit
+      ends `pheobe run` with **no JSON on stdout** (exit 1, stderr only) and tears the worktree down; the kits
+      all parse stdout (found s500, vega: opencode timeout, kimi startup failure)
+- [ ] **issue 16** (`../issues/16-codex-sandbox-cannot-commit-in-a-worktree.md`) — codex `workspace-write` can't
+      write a linked worktree's gitdir (lives under the parent `.git`) so it can't commit; engine says `ok:false`,
+      and `run_task` then skips pheobe's own commit gate despite a clean allowlist + passing `done_when`. Fix for
+      the sandbox half verified with `writable_roots` (found s500, vega)
 - [x] kit drift found s457 (Done, PHEOBE-22): `adopt/claude/self-agent.md` runs `pheobe run <file> --json` (no such
       flag); DESIGN.md's kit table lists `adopt/claude/host/agents/pheobe.md` which does not exist
       (claude has no host kit — the opencode host protocol was used instead); `testparse` labels a
