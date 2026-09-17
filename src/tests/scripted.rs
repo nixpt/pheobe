@@ -28,6 +28,7 @@ impl Provider for ScriptedProvider {
 pub(super) fn script_call(id: &str, name: &str, args: &str) -> ToolCall {
     ToolCall {
         id: id.into(),
+        kind: "function".into(),
         function: ToolFn {
             name: name.into(),
             arguments: args.into(),

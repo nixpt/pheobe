@@ -59,7 +59,18 @@ impl Msg {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolCall {
     pub id: String,
+    /// Always `"function"` on the wire. The OpenAI spec requires it and
+    /// llama.cpp's server rejects an assistant message whose echoed
+    /// tool_calls omit it ("Failed to parse messages: Missing tool call
+    /// type"); flownet/Zen-style gateways merely tolerated its absence
+    /// (issue 12, found on a Kaggle-GPU llama-server, 2026-09-16).
+    #[serde(rename = "type", default = "tool_call_type")]
+    pub kind: String,
     pub function: ToolFn,
+}
+
+fn tool_call_type() -> String {
+    "function".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
