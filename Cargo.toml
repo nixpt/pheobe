@@ -1,6 +1,6 @@
 [package]
 name = "pheobe"
-version = "0.3.3"
+version = "0.3.4"
 description = "A coding workhorse with no face. Task in, worktree branch + handoff report out."
 edition = "2021"
 license = "MIT OR Apache-2.0"
