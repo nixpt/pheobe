@@ -142,6 +142,8 @@ enum AdoptCmd {
     Kimi,
     /// Print the antigravity (agy) skill and adoption kit
     Agy,
+    /// Print the Command Code subagent + skill kit (self mode)
+    CommandCode,
 }
 
 #[derive(Subcommand, Debug)]
@@ -343,6 +345,11 @@ fn cmd_adopt(cmd: Option<AdoptCmd>) -> Result<()> {
         Some(AdoptCmd::Agy) => {
             print!("{}", include_str!("../adopt/agy/README.md"));
             print!("{}", include_str!("../adopt/agy/skill.md"));
+        }
+        Some(AdoptCmd::CommandCode) => {
+            print!("{}", include_str!("../adopt/command-code/README.md"));
+            print!("{}", include_str!("../adopt/command-code/self-agent.md"));
+            print!("{}", include_str!("../adopt/command-code/skill.md"));
         }
     }
     Ok(())

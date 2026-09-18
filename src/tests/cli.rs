@@ -216,6 +216,7 @@ fn adopt_prints_every_kit_and_rejects_unknown() {
         (&["adopt", "cursor"], "Cursor adoption kit"),
         (&["adopt", "kimi"], "Kimi Code adoption"),
         (&["adopt", "agy"], "Antigravity (AGY)"),
+        (&["adopt", "command-code"], "Command Code adoption kit"),
     ];
     for (args, needle) in kits {
         let o = fx.pheobe(args);

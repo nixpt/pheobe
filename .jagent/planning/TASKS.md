@@ -92,6 +92,7 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 - [x] **PHEOBE-37** (`tickets/PHEOBE-37-fix-search-walk-target-files.md`) — fix `search::walk` skipping files starting with "target" (issue 11). Done (agy).
 - [x] **PHEOBE-38** (`tickets/PHEOBE-38-etxtbsy-shim-write.md`) — issue 10: `write_shim` tmp+rename + worker spawn retry on ETXTBSY.
 - [x] **PHEOBE-39** (`tickets/PHEOBE-39-toolcall-type.md`) — `tool_calls[].type = "function"` (issue 12); first self-mode run on a strict llama.cpp server (Kaggle GPU).
+- [ ] **PHEOBE-40** (`tickets/PHEOBE-40-command-code-adopt-kit.md`) — Command Code adoption kit (subagent def + `/pheobe` skill); wires `pheobe adopt command-code`. In review (nixpt/command-code).
 - coverage (cargo-llvm-cov, 2026-09-16, PHEOBE-34): 83.16% lines / 81.05% regions / 79.21% functions (`main.rs` 80.91%; was 79.31% / `main.rs` 0%)
 - [x] PHEOBE-31 — `pheobe doctor` prints compiled version vs crates.io / github tags
 - [x] PHEOBE-32 — `pheobe update` (`cargo install pheobe --locked --force`; git fallback) — shipped as 0.3.0

@@ -3,11 +3,11 @@
 **A coding workhorse with no face. Task in, worktree branch + handoff report out.**
 
 pheobe is a headless coding agent built to be *adopted as a subagent* — by
-another agent harness (Claude Code, opencode, codex, cursor, kimi, agy, bro) or by
-a human's shell. No TUI, no daemon, no session store. It takes a scoped task,
-does the work in its own git worktree on a fresh branch, verifies the result
-against a mechanical `done_when` gate, and returns one JSON report. It never
-touches the caller's checkout.
+another agent harness (Claude Code, opencode, codex, cursor, kimi, agy,
+Command Code, bro) or by a human's shell. No TUI, no daemon, no session
+store. It takes a scoped task, does the work in its own git worktree on a
+fresh branch, verifies the result against a mechanical `done_when` gate, and
+returns one JSON report. It never touches the caller's checkout.
 
 ```text
 adopter ──► pheobe run task.json ──► own LLM endpoint      (self mode)
@@ -83,7 +83,7 @@ no `manual` — a run never ends on vibes.
 | `pheobe verify <task.json>` | `done_when` + path-allowlist gate only; exit 0/1 |
 | `pheobe host setup <task.json>` | host supervisor: intake + worktree + empty plan; JSON `{ok, worktree, branch, task}` |
 | `pheobe host finish <task.json>` | host supervisor: `done_when` + allowlist in `--worktree` (cwd default); JSON; exit 0/1 |
-| `pheobe adopt <claude\|claude-sdk\|opencode\|opencode-self\|codex\|cursor\|kimi\|agy>` | print that harness's adoption kit |
+| `pheobe adopt <claude\|claude-sdk\|opencode\|opencode-self\|codex\|cursor\|kimi\|agy\|command-code>` | print that harness's adoption kit |
 | `pheobe acp --stdio` | Agent Client Protocol server over stdio (e.g. `bro synapse dispatch -- pheobe acp --stdio`) |
 | `pheobe ctx seed` / `ctx brief --for-repo <dir>` / `ctx list` | knowledge drive: land the built-in corpus in `~/.pheobe/knowledge`, then brief the prompt with the entries that match a repo |
 | `pheobe learn …` | closed-loop lesson store |
@@ -110,8 +110,9 @@ Everything is environment-driven; there is no config file.
 contract: Claude Code subagent defs (self and host), an Agent SDK snippet,
 opencode agent defs, a codex bash-tool invocation, a cursor host kit
 (SDK `Agent.create` + IDE `~/.cursor/agents/` + CLI `--sandbox` map), a
-kimi def, an Antigravity (`agy`) skill and subagent def. `pheobe adopt <name>`
-prints the kit; `adopt/README.md` states the contract every kit wraps.
+kimi def, an Antigravity (`agy`) skill and subagent def, and a Command Code
+subagent def plus `/pheobe` skill. `pheobe adopt <name>` prints the kit;
+`adopt/README.md` states the contract every kit wraps.
 
 ## Design
 
