@@ -310,6 +310,8 @@ pub fn run_worker(
             .effective_sandbox()
             .ok()
             .and_then(|t| crate::sandbox::Tier::from_name(&t).ok()),
+        paths_allow: task.paths_allow.clone(),
+        max_usd: task.budget.as_ref().and_then(|b| b.max_usd),
     };
     let res = worker.run_with(&format!("{prompt}\n\nBegin. task_id={task_id}"), wt, &ctx);
 
@@ -343,7 +345,7 @@ pub fn run_worker(
     let handoff = normalize_worker_outcome(&wo);
     Ok(outcome_from_handoff(
         &handoff,
-        1,
+        wo.turns.unwrap_or(1),
         wo.tokens,
         vec![
             Msg::system(prompt.as_str()),

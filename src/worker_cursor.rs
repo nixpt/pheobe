@@ -168,6 +168,7 @@ pub(crate) fn parse_stdout(raw: &str) -> WorkerOutcome {
         tokens: None,
         usd: None,
         json_tail: None,
+        turns: None,
     }
 }
 
@@ -191,6 +192,7 @@ fn from_result_object(v: &Value) -> WorkerOutcome {
         tokens: tokens_from(v),
         usd: usd_from(v),
         json_tail,
+        turns: None,
     }
 }
 
