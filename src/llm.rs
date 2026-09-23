@@ -124,6 +124,10 @@ pub struct Usage {
     pub turns: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub total_tokens: Option<u64>,
+    /// Cost the engine reported (worker route; PHEOBE-46). None = the engine
+    /// doesn't report cost — never estimated here.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub usd: Option<f64>,
 }
 
 /// The LLM behind the loop is pluggable; the loop is the contract.

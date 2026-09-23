@@ -43,14 +43,12 @@
 //!   like the bash tool's moderate tier.
 //! - `free`: plain subprocess.
 
-use crate::sandbox::Tier;
 use crate::worker::{Worker, WorkerCtx, WorkerOutcome};
 use anyhow::{Context, Result};
 use serde_json::Value;
 use std::io::Read;
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::time::Duration;
+use std::path::Path;
+use std::process::Stdio;
 
 const DEFAULT_FLAGS: &str = "--dangerously-skip-permissions";
 const DEFAULT_TIMEOUT_SECS: u64 = 3600;
@@ -85,30 +83,14 @@ impl Worker for ClaudeWorker {
 
         // No tier = a direct `run()` caller outside run_worker: unsandboxed,
         // exactly as before PHEOBE-43. run_worker always resolves one.
-        let mut cmd = match ctx.sandbox.clone() {
-            None => plain(&bin, &argv),
-            Some(Tier::Strict) => anyhow::bail!(
-                "claude worker: sandbox 'strict' is not supported — the claude CLI needs the \
-                 network to reach its API and strict unshares it. Use PHEOBE_SANDBOX=moderate \
-                 (bwrap, network on, worktree-only writes) or free."
-            ),
-            Some(Tier::Free) => plain(&bin, &argv),
-            Some(Tier::Moderate) => match which("bwrap") {
-                Some(bwrap) => {
-                    let mounts = Mounts::for_worktree(worktree);
-                    let mut c = Command::new(bwrap);
-                    c.args(moderate_bwrap_args(&bin, &argv, worktree, &mounts));
-                    c
-                }
-                None => {
-                    eprintln!(
-                        "pheobe: claude worker: bwrap not found — moderate tier degrades to a \
-                         plain subprocess"
-                    );
-                    plain(&bin, &argv)
-                }
-            },
-        };
+        let mut cmd = crate::engine::command(
+            "claude",
+            &bin,
+            &argv,
+            worktree,
+            ctx.sandbox.as_ref(),
+            crate::engine::CLAUDE_HOME_RW,
+        )?;
         cmd.current_dir(worktree);
         cmd.stdin(Stdio::null());
         cmd.stdout(Stdio::piped());
@@ -142,15 +124,13 @@ impl Worker for ClaudeWorker {
             buf
         });
 
-        let status = wait_timeout::ChildExt::wait_timeout(&mut child, Duration::from_secs(timeout))
-            .with_context(|| format!("claude worker: waiting on '{bin}' failed"))?
-            .with_context(|| {
-                format!(
-                    "claude worker: '{bin}' timed out after {timeout}s and was killed \
-                     (set PHEOBE_CLAUDE_TIMEOUT_SECS to adjust; the aging ladder in \
-                     run_worker judges the run separately)"
-                )
-            })?;
+        let status = crate::engine::wait_or_kill(
+            &mut child,
+            timeout,
+            "claude",
+            &bin,
+            "PHEOBE_CLAUDE_TIMEOUT_SECS",
+        )?;
 
         let stdout = stdout_reader.join().unwrap_or_default();
         let stderr = stderr_reader.join().unwrap_or_default();
@@ -190,135 +170,19 @@ pub(crate) fn claude_args(prompt: &str, flags: &str, model: Option<&str>) -> Vec
     a
 }
 
-/// Env (operator) wins over the task's `model`; blank counts as unset.
-pub(crate) fn resolve_model(env: Option<String>, task: Option<&str>) -> Option<String> {
-    env.filter(|m| !m.trim().is_empty())
-        .or_else(|| task.map(str::to_string))
-        .filter(|m| !m.trim().is_empty())
-}
+// Shared with every engine since PHEOBE-46 (engine.rs); re-exported so the
+// claude-sdk worker and the PHEOBE-41..43 tests keep their import paths.
+pub(crate) use crate::engine::{effective_timeout, resolve_model, which, Mounts};
 
-/// min(env timeout, ttl) in whole seconds, never below 1 (PHEOBE-43).
-pub(crate) fn effective_timeout(env_secs: u64, ttl: Option<Duration>) -> u64 {
-    match ttl {
-        Some(t) => env_secs.min(t.as_secs().max(1)),
-        None => env_secs,
-    }
-}
-
-fn plain(bin: &str, argv: &[String]) -> Command {
-    let mut c = Command::new(bin);
-    c.args(argv);
-    c
-}
-
-pub(crate) fn which(name: &str) -> Option<PathBuf> {
-    std::env::var_os("PATH").and_then(|paths| {
-        std::env::split_paths(&paths)
-            .map(|d| d.join(name))
-            .find(|p| p.is_file())
-    })
-}
-
-/// Host paths the moderate sandbox needs besides the worktree.
-#[derive(Debug, Default, Clone)]
-pub(crate) struct Mounts {
-    pub home: Option<PathBuf>,
-    /// the worktree's own git dir (`.git/worktrees/<name>`) — writable
-    pub git_dir: Option<PathBuf>,
-    /// the shared git common dir — writable (engine commits land here)
-    pub git_common: Option<PathBuf>,
-    /// the main checkout's parent, so sibling `../x` path-deps resolve — read-only
-    pub repo_parent: Option<PathBuf>,
-    pub cargo_target: Option<PathBuf>,
-}
-
-impl Mounts {
-    pub(crate) fn for_worktree(wt: &Path) -> Self {
-        let git = |arg: &str| {
-            Command::new("git")
-                .arg("-C")
-                .arg(wt)
-                .args(["rev-parse", "--path-format=absolute", arg])
-                .output()
-                .ok()
-                .filter(|o| o.status.success())
-                .map(|o| PathBuf::from(String::from_utf8_lossy(&o.stdout).trim().to_string()))
-        };
-        let git_common = git("--git-common-dir");
-        Mounts {
-            home: std::env::var_os("HOME").map(PathBuf::from),
-            git_dir: git("--git-dir"),
-            repo_parent: git_common
-                .as_deref()
-                .and_then(Path::parent)
-                .and_then(Path::parent)
-                .map(Path::to_path_buf),
-            git_common,
-            cargo_target: std::env::var_os("CARGO_TARGET_DIR").map(PathBuf::from),
-        }
-    }
-}
-
-/// bwrap argv for a moderate claude run: network shared, writes confined to
-/// the worktree (+ its repo's git store, `~/.claude`, `$CARGO_TARGET_DIR`).
+/// bwrap argv for a moderate claude run: the shared engine confinement with
+/// claude's own state (`~/.claude`, `~/.claude.json`) writable.
 pub(crate) fn moderate_bwrap_args(
     bin: &str,
     argv: &[String],
     wt: &Path,
     m: &Mounts,
 ) -> Vec<String> {
-    let mut a: Vec<String> = vec!["--unshare-pid".into(), "--die-with-parent".into()];
-    let mut add = |flag: &str, p: &Path| {
-        let p = p.display().to_string();
-        a.extend([flag.to_string(), p.clone(), p]);
-    };
-    for d in ["/usr", "/bin", "/sbin", "/lib", "/lib64", "/etc", "/opt"] {
-        add("--ro-bind-try", Path::new(d)); // /etc: DNS + TLS roots for the API
-    }
-    // pseudo-fs + private /tmp FIRST: bwrap applies mounts in order, so a
-    // later --tmpfs /tmp would shadow a worktree (or bin) that lives under /tmp
-    a.extend([
-        "--dev".into(),
-        "/dev".into(),
-        "--proc".into(),
-        "/proc".into(),
-    ]);
-    a.extend(["--tmpfs".into(), "/tmp".into()]);
-    let mut add = |flag: &str, p: &Path| {
-        let p = p.display().to_string();
-        a.extend([flag.to_string(), p.clone(), p]);
-    };
-    // an absolute PHEOBE_CLAUDE_BIN must stay reachable wherever it lives
-    if let Some(dir) = Path::new(bin)
-        .is_absolute()
-        .then(|| Path::new(bin).parent())
-        .flatten()
-    {
-        add("--ro-bind-try", dir);
-    }
-    if let Some(h) = &m.home {
-        add("--ro-bind-try", h);
-        add("--bind-try", &h.join(".claude"));
-        add("--bind-try", &h.join(".claude.json"));
-    }
-    if let Some(ro) = &m.repo_parent {
-        add("--ro-bind-try", ro);
-    }
-    // the git store is WRITABLE: the worker prompt tells the engine to commit
-    // its work (agent.rs), and a commit writes objects + refs into the common
-    // dir, not only the per-worktree gitdir. A read-only store made a live
-    // haiku run (s463) finish the task and then report itself blocked.
-    for rw in [&m.git_common, &m.git_dir, &m.cargo_target]
-        .into_iter()
-        .flatten()
-    {
-        add("--bind-try", rw);
-    }
-    add("--bind", wt);
-    a.extend(["--chdir".into(), wt.display().to_string()]);
-    a.push(bin.to_string());
-    a.extend(argv.iter().cloned());
-    a
+    crate::engine::moderate_bwrap_args(bin, argv, wt, m, crate::engine::CLAUDE_HOME_RW)
 }
 
 /// Token total for the budget estimator: the sum of the usage buckets claude

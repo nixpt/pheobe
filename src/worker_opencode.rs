@@ -27,7 +27,7 @@
 //! hang forever even though the aging ladder wraps it too. The child
 //! inherits the environment (model creds come from opencode's own auth).
 
-use crate::worker::{Worker, WorkerOutcome};
+use crate::worker::{Worker, WorkerCtx, WorkerOutcome};
 use anyhow::{bail, Context, Result};
 use serde_json::Value;
 use std::io::Read;
@@ -74,13 +74,24 @@ pub fn worker() -> Result<Arc<dyn Worker>> {
 
 impl Worker for OpenCodeWorker {
     fn run(&self, prompt: &str, worktree: &Path) -> Result<WorkerOutcome> {
+        self.run_with(prompt, worktree, &WorkerCtx::default())
+    }
+
+    /// PHEOBE-46: model (`PHEOBE_OPENCODE_MODEL` > task), ttl-bounded timeout,
+    /// and pheobe's bwrap confinement in `moderate` (opencode has no sandbox of its own).
+    fn run_with(&self, prompt: &str, worktree: &Path, ctx: &WorkerCtx) -> Result<WorkerOutcome> {
+        let model = crate::engine::resolve_model(self.model.clone(), ctx.model.as_deref());
+        let timeout = Duration::from_secs(crate::engine::effective_timeout(
+            self.timeout.as_secs(),
+            ctx.ttl,
+        ));
         let mut args: Vec<String> = vec![
             "run".into(),
             "--format".into(),
             "json".into(),
             "--auto".into(),
         ];
-        if let Some(m) = &self.model {
+        if let Some(m) = &model {
             args.extend(["-m".into(), m.clone()]);
         }
         if let Some(u) = &self.attach {
@@ -91,8 +102,15 @@ impl Worker for OpenCodeWorker {
         // the message positional: one argument, whole envelope
         args.push(prompt.to_string());
 
-        let mut cmd = std::process::Command::new(&self.bin);
-        cmd.args(&args).current_dir(worktree);
+        let mut cmd = crate::engine::command(
+            "opencode",
+            &self.bin,
+            &args,
+            worktree,
+            ctx.sandbox.as_ref(),
+            crate::engine::OPENCODE_HOME_RW,
+        )?;
+        cmd.current_dir(worktree);
         cmd.stdout(std::process::Stdio::piped());
         cmd.stderr(std::process::Stdio::piped());
         let mut child = match crate::worker::spawn_retry(&mut cmd) {
@@ -126,7 +144,7 @@ impl Worker for OpenCodeWorker {
             if let Some(st) = child.try_wait()? {
                 break st;
             }
-            if started.elapsed() >= self.timeout {
+            if started.elapsed() >= timeout {
                 let _ = child.kill();
                 let _ = child.wait();
                 bail!(
@@ -134,7 +152,7 @@ impl Worker for OpenCodeWorker {
                      (kill applied; raise PHEOBE_OPENCODE_TIMEOUT_SECS if the task \
                      legitimately needs longer)",
                     self.bin,
-                    self.timeout.as_secs()
+                    timeout.as_secs()
                 );
             }
             std::thread::sleep(Duration::from_millis(50));

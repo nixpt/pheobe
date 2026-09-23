@@ -109,7 +109,8 @@ fn run_after_provision(
     //   openai (default)  → the built-in per-turn Provider loop
     //   <worker adapter>  → one prompt out, one whole run back (PHEOBE-4..8)
     // unknown provider → a clear error from the registry, before anything else
-    let provider_name = std::env::var("PHEOBE_PROVIDER").unwrap_or_else(|_| "openai".to_string());
+    // PHEOBE-46: PHEOBE_PROVIDER > task `provider` > openai
+    let provider_name = task.effective_provider();
     let ttl = task.ttl.as_deref().map(aging::parse_ttl).transpose()?;
     let cfg = agent::LoopCfg {
         max_turns: task
@@ -160,6 +161,18 @@ fn run_after_provision(
     // (worker route) and the gate's (issue 05)
     let commits = worktree::commits_since(wt, &base_sha)?;
 
+    // PHEOBE-46: an engine that failed after it was started. Nothing on the
+    // branch → it never produced anything: keep the pre-46 error path (exit 2,
+    // "never ran"). Commits on the branch → the work exists: report it as a
+    // failed run (ok:false, exit 1) with those commits, not as "never ran".
+    if let Some(err) = &outcome.engine_error {
+        if commits.is_empty() {
+            let _ = learn::end_session(session.as_ref(), "engine_error", 2);
+            anyhow::bail!("{err}");
+        }
+        progress("❌ engine failed after committing — reporting its commits as a failed run");
+    }
+
     let tests = if outcome.ok || dirty {
         Some(verify::run_done_when(task, wt)?)
     } else {
@@ -192,7 +205,7 @@ fn run_after_provision(
         },
         usage: Some(report::Usage {
             turns: outcome.usage.turns,
-            usd: None,
+            usd: outcome.usage.usd,
         }),
     };
     if task.push && ok {

@@ -153,7 +153,11 @@ fn opencode_run_worker_envelope_prompt_and_json_tail_normalization() {
     .to_string();
     let w = opencodew(&fake_bin(&dir, "opencode", &stream));
 
-    let task = worker_task();
+    // free: this test is about the envelope + handoff normalization, and its
+    // fake engine records argv OUTSIDE the worktree — which the moderate tier
+    // (PHEOBE-46: bwrap for opencode) now correctly forbids.
+    let mut task = worker_task();
+    task.sandbox = Some("free".into());
     let cfg = LoopCfg::default();
     let out = run_worker(&w, &task, &wt, "oc1", "", &[], &cfg).unwrap();
     assert!(out.ok);
@@ -265,5 +269,48 @@ fn opencode_binary_not_found_error_is_clear() {
     );
     assert!(err.contains("not found"), "got: {err}");
     assert!(err.contains("PHEOBE_OPENCODE_BIN"), "names the fix: {err}");
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+/// PHEOBE-46: task `model` → `-m`; `PHEOBE_OPENCODE_MODEL` beats it; the
+/// ttl caps the timeout; strict is refused (opencode needs the network).
+#[test]
+fn opencode_run_with_honours_task_model_and_env_override() {
+    let _g = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let dir = env_root("run-with-model");
+    let wt = dir.join("wt");
+    std::fs::create_dir_all(&wt).unwrap();
+    let ctx = crate::worker::WorkerCtx {
+        model: Some("prov/task-model".into()),
+        sandbox: Some(crate::sandbox::Tier::Free),
+        ..Default::default()
+    };
+    let w = opencodew(&fake_bin(&dir, "opencode", CANNED_STREAM));
+    w.run_with("p", &wt, &ctx).unwrap();
+    let argv = read_argv(&dir);
+    assert!(
+        argv.windows(2).any(|w| w == ["-m", "prov/task-model"]),
+        "{argv:?}"
+    );
+
+    unsafe { std::env::set_var("PHEOBE_OPENCODE_MODEL", "prov/env-model") };
+    let w = opencodew(&fake_bin(&dir, "opencode", CANNED_STREAM));
+    unsafe { std::env::remove_var("PHEOBE_OPENCODE_MODEL") };
+    w.run_with("p", &wt, &ctx).unwrap();
+    let argv = read_argv(&dir);
+    assert!(
+        argv.windows(2).any(|w| w == ["-m", "prov/env-model"]),
+        "env wins: {argv:?}"
+    );
+
+    let strict = crate::worker::WorkerCtx {
+        sandbox: Some(crate::sandbox::Tier::Strict),
+        ..Default::default()
+    };
+    let err = format!("{:#}", w.run_with("p", &wt, &strict).unwrap_err());
+    assert!(
+        err.contains("opencode worker: sandbox 'strict' is not supported"),
+        "{err}"
+    );
     std::fs::remove_dir_all(&dir).ok();
 }

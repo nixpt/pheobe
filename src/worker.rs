@@ -13,7 +13,7 @@
 use anyhow::{bail, Result};
 use serde_json::Value;
 use std::path::Path;
-use std::process::{Child, Command, Output};
+use std::process::{Child, Command};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -122,6 +122,17 @@ const REGISTRY: &[(&str, WorkerFactory)] = &[
 ];
 
 /// Resolve a `PHEOBE_PROVIDER` name. `Ok(None)` = the built-in per-turn
+/// Registered worker names (PHEOBE-46: task `provider` validation).
+pub fn provider_names() -> Vec<&'static str> {
+    REGISTRY.iter().map(|(n, _)| *n).collect()
+}
+
+/// `openai` (the built-in loop) or a registered worker name.
+pub fn is_known_provider(name: &str) -> bool {
+    let n = name.trim();
+    n == "openai" || REGISTRY.iter().any(|(r, _)| *r == n)
+}
+
 /// `Provider` loop (openai, the default). `Ok(Some(_))` = a registered
 /// worker adapter. Unknown name = a clear error naming the culprit.
 pub fn worker_from_env(provider: &str) -> Result<Option<Arc<dyn Worker>>> {
@@ -161,21 +172,6 @@ pub(crate) fn spawn_retry(cmd: &mut Command) -> std::io::Result<Child> {
         }
     }
     cmd.spawn()
-}
-
-/// `Command::output` with the same ETXTBSY backoff as [`spawn_retry`].
-pub(crate) fn output_retry(cmd: &mut Command) -> std::io::Result<Output> {
-    let mut wait = Duration::from_millis(2);
-    for attempt in 0..8 {
-        match cmd.output() {
-            Err(e) if is_etxtbsy(&e) && attempt + 1 < 8 => {
-                std::thread::sleep(wait);
-                wait = wait.saturating_mul(2);
-            }
-            other => return other,
-        }
-    }
-    cmd.output()
 }
 
 #[cfg(test)]

@@ -94,11 +94,35 @@ pub fn worker() -> Result<std::sync::Arc<dyn Worker>> {
 
 impl Worker for CodexWorker {
     fn run(&self, prompt: &str, worktree: &Path) -> Result<WorkerOutcome> {
-        let sandbox = sandbox_flag(&self.tier)?;
+        self.run_with(prompt, worktree, &crate::worker::WorkerCtx::default())
+    }
+
+    /// PHEOBE-46: `-m` (`PHEOBE_CODEX_MODEL` > task), a timeout at all
+    /// (min(`PHEOBE_CODEX_TIMEOUT_SECS`, ttl); codex had none), and the run's
+    /// tier (task `sandbox`, not only the env) on codex's native `--sandbox`.
+    fn run_with(
+        &self,
+        prompt: &str,
+        worktree: &Path,
+        ctx: &crate::worker::WorkerCtx,
+    ) -> Result<WorkerOutcome> {
+        let tier = match &ctx.sandbox {
+            Some(t) => t.as_str().to_string(),
+            None => self.tier.clone(),
+        };
+        let sandbox = sandbox_flag(&tier)?;
         let mut prompt = format!("{prompt}{WORKER_NOTE}");
-        if self.tier == "strict" {
+        if tier == "strict" {
             prompt.push_str(STRICT_NOTE);
         }
+        let model = crate::engine::resolve_model(
+            std::env::var("PHEOBE_CODEX_MODEL").ok(),
+            ctx.model.as_deref(),
+        );
+        let timeout = crate::engine::effective_timeout(
+            crate::engine::env_secs("PHEOBE_CODEX_TIMEOUT_SECS", DEFAULT_TIMEOUT_SECS),
+            ctx.ttl,
+        );
         let mut cmd = Command::new(&self.bin);
         cmd.args([
             "exec",
@@ -106,23 +130,61 @@ impl Worker for CodexWorker {
             "--skip-git-repo-check",
             "--sandbox",
             sandbox,
-        ])
-        .arg(&prompt)
-        .current_dir(worktree);
-        let out = crate::worker::output_retry(&mut cmd).with_context(|| {
+        ]);
+        if let Some(m) = &model {
+            cmd.args(["-m", m.as_str()]);
+        }
+        cmd.arg(&prompt)
+            .current_dir(worktree)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped());
+        let mut child = crate::worker::spawn_retry(&mut cmd).with_context(|| {
             format!(
                 "failed to spawn '{} exec' — is the codex binary on PATH \
                      (or point PHEOBE_CODEX_BIN at it)?",
                 self.bin
             )
         })?;
-        if !out.status.success() {
-            let stderr = String::from_utf8_lossy(&out.stderr);
-            bail!("codex exec exited with {}: {}", out.status, stderr.trim());
+        let mut out_pipe = child
+            .stdout
+            .take()
+            .context("codex worker: no stdout pipe")?;
+        let mut err_pipe = child
+            .stderr
+            .take()
+            .context("codex worker: no stderr pipe")?;
+        let out_reader = std::thread::spawn(move || {
+            let mut buf = Vec::new();
+            let _ = std::io::Read::read_to_end(&mut out_pipe, &mut buf);
+            buf
+        });
+        let err_reader = std::thread::spawn(move || {
+            let mut buf = Vec::new();
+            let _ = std::io::Read::read_to_end(&mut err_pipe, &mut buf);
+            buf
+        });
+        let status = crate::engine::wait_or_kill(
+            &mut child,
+            timeout,
+            "codex",
+            &self.bin,
+            "PHEOBE_CODEX_TIMEOUT_SECS",
+        )?;
+        let stdout = out_reader.join().unwrap_or_default();
+        let stderr = err_reader.join().unwrap_or_default();
+        if !status.success() {
+            bail!(
+                "codex exec exited with {}: {}",
+                status,
+                String::from_utf8_lossy(&stderr).trim()
+            );
         }
-        parse_jsonl(&String::from_utf8_lossy(&out.stdout))
+        parse_jsonl(&String::from_utf8_lossy(&stdout))
     }
 }
+
+const DEFAULT_TIMEOUT_SECS: u64 = 3600;
 
 /// The `--json` event stream: last `agent_message` is the final text, the
 /// last `turn.completed` usage is the token count. A final message that is
@@ -450,5 +512,35 @@ EOF
         let w = CodexWorker::from_env().unwrap();
         assert_eq!(w.bin, "codex", "unset bin falls back to PATH lookup");
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// PHEOBE-46: task `model` → `-m`, and the task's tier (free) reaches
+    /// codex's native `--sandbox` instead of the constructed env tier.
+    #[test]
+    fn codex_run_with_task_model_and_task_tier() {
+        let dir = scratch("run-with");
+        let (script, captured) = capture_codex(&dir, "done");
+        let worker = CodexWorker {
+            bin: script.to_string_lossy().into(),
+            tier: "moderate".into(),
+        };
+        let ctx = crate::worker::WorkerCtx {
+            model: Some("gpt-6-luna".into()),
+            sandbox: Some(crate::sandbox::Tier::Free),
+            ..Default::default()
+        };
+        worker.run_with("p", &dir, &ctx).unwrap();
+        let args = std::fs::read_to_string(&captured).unwrap();
+        let lines: Vec<&str> = args.lines().collect();
+        assert!(
+            lines.windows(2).any(|w| w == ["-m", "gpt-6-luna"]),
+            "{args}"
+        );
+        assert!(
+            lines
+                .windows(2)
+                .any(|w| w == ["--sandbox", "danger-full-access"]),
+            "{args}"
+        );
     }
 }

@@ -20,12 +20,11 @@
 //! - `PHEOBE_AGY_TIMEOUT_SECS` (default 3600)
 //! - `PHEOBE_SANDBOX` (strict | moderate | free)
 
-use crate::worker::{Worker, WorkerOutcome};
+use crate::worker::{Worker, WorkerCtx, WorkerOutcome};
 use anyhow::{bail, Context, Result};
 use serde_json::Value;
 use std::io::Read;
 use std::path::Path;
-use std::time::Duration;
 
 const DEFAULT_BIN: &str = "agy";
 const DEFAULT_FLAGS: &str = "--dangerously-skip-permissions";
@@ -53,26 +52,54 @@ pub(crate) fn sandbox_enabled(tier: &str) -> Result<bool> {
 
 impl Worker for AgyWorker {
     fn run(&self, prompt: &str, worktree: &Path) -> Result<WorkerOutcome> {
+        self.run_with(prompt, worktree, &WorkerCtx::default())
+    }
+
+    /// PHEOBE-46: `--model` (`PHEOBE_AGY_MODEL` > task), ttl-bounded timeout,
+    /// and the run's tier: strict → agy's native `--sandbox`; moderate →
+    /// pheobe's bwrap confinement (agy has none of its own there); free → plain.
+    /// A direct `run()` (no resolved tier) keeps the pre-46 env behaviour.
+    fn run_with(&self, prompt: &str, worktree: &Path, ctx: &WorkerCtx) -> Result<WorkerOutcome> {
         let bin = std::env::var("PHEOBE_AGY_BIN").unwrap_or_else(|_| DEFAULT_BIN.to_string());
         let flags = std::env::var("PHEOBE_AGY_FLAGS").unwrap_or_else(|_| DEFAULT_FLAGS.to_string());
-        let timeout = std::env::var("PHEOBE_AGY_TIMEOUT_SECS")
-            .ok()
-            .and_then(|v| v.parse::<u64>().ok())
-            .unwrap_or(DEFAULT_TIMEOUT_SECS);
-        let tier = std::env::var("PHEOBE_SANDBOX").unwrap_or_else(|_| "moderate".into());
-        let use_sandbox = sandbox_enabled(&tier)?;
+        let timeout = crate::engine::effective_timeout(
+            crate::engine::env_secs("PHEOBE_AGY_TIMEOUT_SECS", DEFAULT_TIMEOUT_SECS),
+            ctx.ttl,
+        );
+        let tier = crate::engine::tier_or_env(ctx.sandbox.as_ref())?;
+        let use_sandbox = sandbox_enabled(tier.as_str())?;
+        let model = crate::engine::resolve_model(
+            std::env::var("PHEOBE_AGY_MODEL").ok(),
+            ctx.model.as_deref(),
+        );
 
-        let mut cmd = std::process::Command::new(&bin);
-        cmd.arg("-p").arg(prompt).arg("--output-format").arg("json");
-
+        let mut argv: Vec<String> = vec![
+            "-p".into(),
+            prompt.to_string(),
+            "--output-format".into(),
+            "json".into(),
+        ];
         if use_sandbox {
-            cmd.arg("--sandbox");
+            argv.push("--sandbox".into());
         }
-
-        for flag in flags.split_whitespace() {
-            cmd.arg(flag);
+        if let Some(m) = &model {
+            argv.extend(["--model".into(), m.clone()]);
         }
-
+        argv.extend(flags.split_whitespace().map(str::to_string));
+        // bwrap only for a RESOLVED moderate tier (run_worker); strict uses
+        // agy's own --sandbox above, so pheobe spawns it plain.
+        let bwrap_tier = match &ctx.sandbox {
+            Some(crate::sandbox::Tier::Moderate) => Some(crate::sandbox::Tier::Moderate),
+            _ => None,
+        };
+        let mut cmd = crate::engine::command(
+            "agy",
+            &bin,
+            &argv,
+            worktree,
+            bwrap_tier.as_ref(),
+            crate::engine::AGY_HOME_RW,
+        )?;
         cmd.current_dir(worktree);
         cmd.stdin(std::process::Stdio::null());
         cmd.stdout(std::process::Stdio::piped());
@@ -99,15 +126,13 @@ impl Worker for AgyWorker {
             buf
         });
 
-        let status = wait_timeout::ChildExt::wait_timeout(&mut child, Duration::from_secs(timeout))
-            .with_context(|| format!("agy worker: waiting on '{bin}' failed"))?
-            .with_context(|| {
-                format!(
-                    "agy worker: '{bin}' timed out after {timeout}s and was killed \
-                     (set PHEOBE_AGY_TIMEOUT_SECS to adjust; the aging ladder in \
-                     run_worker judges the run separately)"
-                )
-            })?;
+        let status = crate::engine::wait_or_kill(
+            &mut child,
+            timeout,
+            "agy",
+            &bin,
+            "PHEOBE_AGY_TIMEOUT_SECS",
+        )?;
 
         let stdout = stdout_reader.join().unwrap_or_default();
         let stderr = stderr_reader.join().unwrap_or_default();
