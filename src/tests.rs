@@ -9,6 +9,7 @@ mod agent_loop;
 mod aging;
 mod agy;
 mod claude;
+mod claude_sdk;
 mod contract;
 mod cursor;
 mod e2e;

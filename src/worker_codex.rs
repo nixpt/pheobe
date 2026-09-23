@@ -171,6 +171,7 @@ fn parse_jsonl(stdout: &str) -> Result<WorkerOutcome> {
         tokens,
         usd: None,
         json_tail,
+        turns: None,
     })
 }
 

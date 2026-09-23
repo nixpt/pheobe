@@ -170,6 +170,7 @@ impl Worker for OpenCodeWorker {
             tokens,
             usd,
             json_tail,
+            turns: None,
         })
     }
 }

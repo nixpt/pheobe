@@ -12,7 +12,7 @@ use std::process::Command;
 
 /// jokersquad safe-exec semantics: hard-deny destructive patterns, modes
 /// warn/deny/off (default deny). Exit 99 on hard-deny is upstream's shape.
-pub(super) fn destructive_guard(cmd: &str) -> Option<&'static str> {
+pub(crate) fn destructive_guard(cmd: &str) -> Option<&'static str> {
     const DENY: &[(&str, &str)] = &[
         ("rm -rf /", "rm -rf /"),
         ("rm -rf ~", "rm -rf ~"),
