@@ -34,12 +34,19 @@ pub struct Task {
     /// explicit task value — env is the operator override).
     #[serde(default)]
     pub sandbox: Option<String>,
-    /// Engine model for worker adapters that support one (PHEOBE-41; today:
-    /// claude, passed as `--model`). An operator env override
-    /// (`PHEOBE_CLAUDE_MODEL`) wins over this, as `PHEOBE_SANDBOX` wins over
-    /// `sandbox`. Ignored by the built-in loop (that uses `PHEOBE_MODEL`).
+    /// Engine model for worker adapters (PHEOBE-41 claude; PHEOBE-46 every
+    /// engine: opencode/codex/kimi `-m`, cursor/agy `--model`). The adapter's
+    /// own env override (`PHEOBE_<ENGINE>_MODEL`) wins over this, as
+    /// `PHEOBE_SANDBOX` wins over `sandbox`. Ignored by the built-in loop
+    /// (that uses `PHEOBE_MODEL`).
     #[serde(default)]
     pub model: Option<String>,
+    /// Engine for this task (PHEOBE-46): `openai` (the built-in loop) or a
+    /// registered worker (`opencode`, `claude`, `claude-sdk`, `codex`,
+    /// `cursor`, `kimi`, `agy`). `PHEOBE_PROVIDER` wins over it — the operator
+    /// override, the same rule as `sandbox`/`model`.
+    #[serde(default)]
+    pub provider: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -155,7 +162,25 @@ impl Task {
         if t.contains(" and also ") {
             bail!("multiple top-level goals — one purpose per run");
         }
+        if let Some(p) = &self.provider {
+            if !crate::worker::is_known_provider(p) {
+                bail!(
+                    "unknown provider '{p}' — one of: openai, {}",
+                    crate::worker::provider_names().join(", ")
+                );
+            }
+        }
         Ok(())
+    }
+
+    /// The engine this task runs on: `PHEOBE_PROVIDER` > task `provider` >
+    /// `openai` (PHEOBE-46).
+    pub fn effective_provider(&self) -> String {
+        std::env::var("PHEOBE_PROVIDER")
+            .ok()
+            .filter(|p| !p.trim().is_empty())
+            .or_else(|| self.provider.clone())
+            .unwrap_or_else(|| "openai".to_string())
     }
 
     pub fn resolve_repo(&self) -> Result<PathBuf> {

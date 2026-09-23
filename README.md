@@ -101,20 +101,37 @@ Everything is environment-driven; there is no config file.
 | variable | values | default |
 |---|---|---|
 | `PHEOBE_BASE_URL` / `PHEOBE_MODEL` / `PHEOBE_API_KEY` | the self-mode endpoint | — |
-| `PHEOBE_PROVIDER` | `openai` (built-in turn loop) or a worker adapter: `opencode`, `claude`, `claude-sdk`, `codex`, `cursor`, `kimi`, `agy` | `openai` |
+| `PHEOBE_PROVIDER` | `openai` (built-in turn loop) or a worker adapter: `opencode`, `claude`, `claude-sdk`, `codex`, `cursor`, `kimi`, `agy`; wins over the task's `provider` | task `provider`, else `openai` |
 | `PHEOBE_SANDBOX` | `strict` \| `moderate` \| `free` (bwrap tiers; env wins over the task's `sandbox`) | `moderate` |
 | `PHEOBE_MEMORY` | `none` \| `local` \| `host` (host = a joker-mcp memory store) | `local` |
 | `PHEOBE_KEEP_WORKTREE` | `1` / `true` / `yes` — leave a failed-run worktree on disk | unset (tear down on early `run` error) |
-| `PHEOBE_<PROVIDER>_BIN` / `_FLAGS` / `_TIMEOUT_SECS` | per-adapter binary, extra flags, wall-clock cap (claude: effective cap = min(this, task `ttl`)) | adapter default |
-| `PHEOBE_CLAUDE_MODEL` | claude worker model, appended as `--model` (keeps `_FLAGS`); wins over the task's `model` | unset (task `model`, else the CLI's default) |
+| `PHEOBE_<PROVIDER>_BIN` / `_FLAGS` / `_TIMEOUT_SECS` | per-adapter binary, extra flags, wall-clock cap. Every adapter: effective cap = min(this, task `ttl`), and a timed-out engine is killed | adapter default |
+| `PHEOBE_<PROVIDER>_MODEL` | per-adapter model (`CLAUDE`, `OPENCODE`, `CODEX`, `CURSOR`, `KIMI`, `AGY`); wins over the task's `model` | unset (task `model`, else the CLI's default) |
 | `PHEOBE_CLAUDE_SDK_ALLOW` | claude-sdk: comma list of extra tools to allow outright (e.g. `WebFetch`) | unset |
 | `PHEOBE_CLAUDE_SDK_GRACE_SECS` | claude-sdk: seconds to wait for a result after the TTL `interrupt` before killing | `10` |
 
-The claude worker honours the sandbox tier for the WHOLE engine run:
-`moderate` = bwrap with the network shared, `$HOME` read-only except
-`~/.claude`, writes confined to the worktree + its repo's git store (+
-`$CARGO_TARGET_DIR`); `strict` is refused (the CLI needs the network for its
-API); `free` = plain subprocess.
+### Engine parity (PHEOBE-46)
+
+Every engine honours the task's `provider`, `model`, `ttl` and `sandbox` the same
+way, and the report carries what the engine actually did:
+
+| engine | model flag | sandbox `moderate` | sandbox `strict` | `usage.usd` |
+|---|---|---|---|---|
+| `claude` | `--model` | pheobe bwrap | refused (needs network) | reported cost |
+| `claude-sdk` | `--model` | pheobe bwrap | refused | `total_cost_usd` |
+| `opencode` | `-m` | pheobe bwrap | refused | summed `step_finish.cost` |
+| `kimi` | `-m` | pheobe bwrap | refused | if the gateway reports it |
+| `agy` | `--model` | pheobe bwrap | agy `--sandbox` | none (not reported) |
+| `cursor` | `--model` | cursor `--sandbox enabled` | cursor `--sandbox enabled` | `chargedCents / 100` |
+| `codex` | `-m` | codex `--sandbox workspace-write` | codex `--sandbox read-only` | none (no price table invented) |
+
+pheobe bwrap = the WHOLE engine run in bwrap with the network shared, `$HOME`
+read-only except the engine's own state dirs (e.g. `~/.claude`,
+`~/.local/share/opencode`, `~/.cece`, `~/.gemini`), writes confined to the
+worktree + its repo's git store (+ `$CARGO_TARGET_DIR`). `free` = plain subprocess
+everywhere. `usage.turns` is the engine's own turn count where it reports one.
+An engine that fails **after** committing reports `ok:false` with its commits
+(exit 1); one that fails before producing anything is still exit 2.
 
 ### The `claude-sdk` worker (PHEOBE-45)
 

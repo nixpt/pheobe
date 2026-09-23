@@ -354,6 +354,7 @@ mod tests {
             push: false,
             sandbox: Some("free".into()),
             model: None,
+            provider: None,
         };
         // task says free, but env overrides to strict
         unsafe { std::env::set_var("PHEOBE_SANDBOX", "strict") };

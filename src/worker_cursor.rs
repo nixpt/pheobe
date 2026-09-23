@@ -33,12 +33,11 @@
 //! `PHEOBE_SANDBOX`. The child inherits `CURSOR_API_KEY` /
 //! `CURSOR_API_ENDPOINT`.
 
-use crate::worker::{Worker, WorkerOutcome};
+use crate::worker::{Worker, WorkerCtx, WorkerOutcome};
 use anyhow::{bail, Context, Result};
 use serde_json::Value;
 use std::io::Read;
 use std::path::Path;
-use std::time::Duration;
 
 const DEFAULT_BIN: &str = "cursor-agent";
 const DEFAULT_FLAGS: &str = "--yolo --trust";
@@ -66,15 +65,26 @@ pub(crate) fn sandbox_flag(tier: &str) -> Result<&'static str> {
 
 impl Worker for CursorWorker {
     fn run(&self, prompt: &str, worktree: &Path) -> Result<WorkerOutcome> {
+        self.run_with(prompt, worktree, &WorkerCtx::default())
+    }
+
+    /// PHEOBE-46: `--model` (`PHEOBE_CURSOR_MODEL` > task), ttl-bounded
+    /// timeout, and the run's tier (task `sandbox`, not only the env) mapped to
+    /// cursor's native `--sandbox`.
+    fn run_with(&self, prompt: &str, worktree: &Path, ctx: &WorkerCtx) -> Result<WorkerOutcome> {
         let bin = std::env::var("PHEOBE_CURSOR_BIN").unwrap_or_else(|_| DEFAULT_BIN.to_string());
         let flags =
             std::env::var("PHEOBE_CURSOR_FLAGS").unwrap_or_else(|_| DEFAULT_FLAGS.to_string());
-        let timeout = std::env::var("PHEOBE_CURSOR_TIMEOUT_SECS")
-            .ok()
-            .and_then(|v| v.parse::<u64>().ok())
-            .unwrap_or(DEFAULT_TIMEOUT_SECS);
-        let tier = std::env::var("PHEOBE_SANDBOX").unwrap_or_else(|_| "moderate".into());
-        let sandbox = sandbox_flag(&tier)?;
+        let timeout = crate::engine::effective_timeout(
+            crate::engine::env_secs("PHEOBE_CURSOR_TIMEOUT_SECS", DEFAULT_TIMEOUT_SECS),
+            ctx.ttl,
+        );
+        let tier = crate::engine::tier_or_env(ctx.sandbox.as_ref())?;
+        let sandbox = sandbox_flag(tier.as_str())?;
+        let model = crate::engine::resolve_model(
+            std::env::var("PHEOBE_CURSOR_MODEL").ok(),
+            ctx.model.as_deref(),
+        );
 
         let mut cmd = std::process::Command::new(&bin);
         cmd.arg("-p")
@@ -82,6 +92,9 @@ impl Worker for CursorWorker {
             .arg("json")
             .arg("--sandbox")
             .arg(sandbox);
+        if let Some(m) = &model {
+            cmd.arg("--model").arg(m);
+        }
         cmd.args(flags.split_whitespace());
         cmd.arg(prompt);
         cmd.current_dir(worktree);
@@ -115,15 +128,13 @@ impl Worker for CursorWorker {
             buf
         });
 
-        let status = wait_timeout::ChildExt::wait_timeout(&mut child, Duration::from_secs(timeout))
-            .with_context(|| format!("cursor worker: waiting on '{bin}' failed"))?
-            .with_context(|| {
-                format!(
-                    "cursor worker: '{bin}' timed out after {timeout}s and was killed \
-                     (set PHEOBE_CURSOR_TIMEOUT_SECS to adjust; the aging ladder in \
-                     run_worker judges the run separately)"
-                )
-            })?;
+        let status = crate::engine::wait_or_kill(
+            &mut child,
+            timeout,
+            "cursor",
+            &bin,
+            "PHEOBE_CURSOR_TIMEOUT_SECS",
+        )?;
 
         let stdout = stdout_reader.join().unwrap_or_default();
         let stderr = stderr_reader.join().unwrap_or_default();

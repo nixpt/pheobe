@@ -9,6 +9,7 @@ pub mod agent;
 pub mod aging;
 pub mod checkpoint;
 pub mod claude_proto;
+pub mod engine;
 pub mod fmt;
 pub mod host;
 pub mod knowledge;

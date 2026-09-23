@@ -19,6 +19,7 @@ mod knowledge;
 mod opencode;
 mod outcome;
 mod p10;
+mod parity;
 mod runner;
 mod scripted;
 mod search;
