@@ -39,5 +39,19 @@ pub fn run_done_when(task: &Task, cwd: &Path) -> Result<TestEvidence> {
                 parsed,
             })
         }
+        DoneWhen::FilesExist { paths } => {
+            let missing: Vec<&str> = paths
+                .iter()
+                .map(String::as_str)
+                .filter(|p| !cwd.join(p).exists())
+                .collect();
+            Ok(TestEvidence {
+                ran: format!("files_exist: {}", paths.join(", ")),
+                passed: missing.is_empty(),
+                output_excerpt: (!missing.is_empty())
+                    .then(|| format!("missing: {}", missing.join(", "))),
+                parsed: None,
+            })
+        }
     }
 }

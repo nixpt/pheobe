@@ -196,6 +196,8 @@ pub fn build_prompt_for(
         match &task.done_when {
             crate::task::DoneWhen::Command { run, expect_exit } =>
                 format!("{run} [expect exit {expect_exit}]"),
+            crate::task::DoneWhen::FilesExist { paths } =>
+                format!("files exist: {}", paths.join(", ")),
         },
         task.paths_allow
     ));
@@ -301,7 +303,15 @@ pub fn run_worker(
         }
     }
 
-    let res = worker.run(&format!("{prompt}\n\nBegin. task_id={task_id}"), wt);
+    let ctx = crate::worker::WorkerCtx {
+        model: task.model.clone(),
+        ttl: cfg.ttl,
+        sandbox: task
+            .effective_sandbox()
+            .ok()
+            .and_then(|t| crate::sandbox::Tier::from_name(&t).ok()),
+    };
+    let res = worker.run_with(&format!("{prompt}\n\nBegin. task_id={task_id}"), wt, &ctx);
 
     // deadline check AFTER the worker call — the engine's internal loop has
     // no visibility into pheobe's ladder, so an engine that overruns its ttl

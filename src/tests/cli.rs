@@ -295,7 +295,14 @@ fn run_without_done_when_is_refused_and_json_flag_is_accepted() {
         ),
     );
     let o = fx.pheobe(&["run", task.to_str().unwrap(), "--json"]);
-    assert_eq!(code(&o), 1, "must refuse; stdout={}", stdout(&o));
+    // PHEOBE-42 flipped this pin: an intake refusal is exit 2 (never ran)
+    // and stdout still carries one JSON report naming the reason.
+    assert_eq!(code(&o), 2, "must refuse; stdout={}", stdout(&o));
+    assert!(
+        stdout(&o).contains("done_when"),
+        "JSON report names the reason: {}",
+        stdout(&o)
+    );
     assert!(
         stderr(&o).contains("done_when"),
         "clear intake reason, got {}",
@@ -337,5 +344,80 @@ fn learn_nudge_and_check_list_smoke() {
         stdout(&o).contains("no checkpoints") || stdout(&o).contains("NAME"),
         "{}",
         stdout(&o)
+    );
+}
+
+// ── PHEOBE-42: `run` exit codes; stdout is always one JSON report ───────────
+
+fn report(out: &Output) -> serde_json::Value {
+    serde_json::from_slice(&out.stdout).unwrap_or_else(|e| {
+        panic!(
+            "stdout is not one JSON report ({e}): {}",
+            String::from_utf8_lossy(&out.stdout)
+        )
+    })
+}
+
+#[test]
+fn run_intake_errors_exit_2_with_a_json_report() {
+    let fx = Fx::new();
+    let bad = fx.repo.join("bad.json");
+    std::fs::write(&bad, "{ not json").unwrap();
+    let out = fx.pheobe(&["run", bad.to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(2));
+    let r = report(&out);
+    assert_eq!(r["ok"], false);
+    assert!(r["blocked"].as_str().unwrap().starts_with("error:"), "{r}");
+
+    let vague = fx.repo.join("vague.json");
+    std::fs::write(
+        &vague,
+        r#"{"task":"improve the code","done_when":{"type":"command","run":"true"}}"#,
+    )
+    .unwrap();
+    let out = fx.pheobe(&["run", vague.to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(2));
+    assert!(report(&out)["blocked"]
+        .as_str()
+        .unwrap()
+        .contains("vague ask"));
+}
+
+#[test]
+fn run_ok_false_exits_1_with_the_report() {
+    let fx = Fx::new();
+    let shim = fx.repo.parent().unwrap().join("fake-claude");
+    std::fs::write(
+        &shim,
+        "#!/bin/sh\necho '{\"type\":\"result\",\"result\":\"did nothing\"}'\n",
+    )
+    .unwrap();
+    std::process::Command::new("chmod")
+        .args(["+x", shim.to_str().unwrap()])
+        .status()
+        .unwrap();
+    let task = fx.repo.parent().unwrap().join("t.json");
+    std::fs::write(
+        &task,
+        format!(
+            r#"{{"task":"Create done.txt at the repo root","done_when":{{"type":"files_exist","paths":["done.txt"]}},"repo":"{}"}}"#,
+            fx.repo.display()
+        ),
+    )
+    .unwrap();
+    let out = fx.pheobe_env(
+        &["run", task.to_str().unwrap()],
+        &[
+            ("PHEOBE_PROVIDER", "claude"),
+            ("PHEOBE_CLAUDE_BIN", shim.to_str().unwrap()),
+        ],
+    );
+    let r = report(&out);
+    assert_eq!(r["ok"], false, "{r}");
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
     );
 }

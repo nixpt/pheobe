@@ -300,3 +300,91 @@ fn claude_is_error_surfaces_as_failure() {
     );
     std::fs::remove_dir_all(&f.dir).ok();
 }
+
+// ── PHEOBE-41/43: model env, ttl-bounded timeout, moderate bwrap ────────────
+
+fn run_fake_ctx(
+    f: &FakeClaude,
+    ctx: &crate::worker::WorkerCtx,
+) -> anyhow::Result<crate::worker::WorkerOutcome> {
+    let argv_path = f.dir.join("argv.txt");
+    let _ = std::fs::remove_file(&argv_path);
+    set_env("PHEOBE_CLAUDE_BIN", &f.script.display().to_string());
+    set_env("PHEOBE_FAKE_ARGV", &argv_path.display().to_string());
+    let out = crate::worker_claude::ClaudeWorker.run_with("p", &f.dir, ctx);
+    for k in [
+        "PHEOBE_CLAUDE_BIN",
+        "PHEOBE_FAKE_ARGV",
+        "PHEOBE_CLAUDE_MODEL",
+        "PHEOBE_CLAUDE_TIMEOUT_SECS",
+        "PHEOBE_FAKE_SLEEP",
+    ] {
+        del_env(k);
+    }
+    out
+}
+
+/// PHEOBE-41: the env model is appended; the default skip-permissions flag stays.
+#[test]
+fn claude_model_env_appends_without_dropping_default_flags() {
+    let _g = claude_env_lock();
+    let f = FakeClaude::new("model", r#"{"type":"result","result":"ok"}"#);
+    set_env("PHEOBE_CLAUDE_MODEL", "sonnet");
+    let ctx = crate::worker::WorkerCtx {
+        model: Some("haiku".into()),
+        ..Default::default()
+    };
+    run_fake_ctx(&f, &ctx).unwrap();
+    let argv = f.argv();
+    assert!(
+        argv.contains(&"--dangerously-skip-permissions".to_string()),
+        "{argv:?}"
+    );
+    let i = argv.iter().position(|a| a == "--model").expect("--model");
+    assert_eq!(argv[i + 1], "sonnet", "env wins over the task model");
+    std::fs::remove_dir_all(&f.dir).ok();
+}
+
+/// PHEOBE-43: a ttl shorter than PHEOBE_CLAUDE_TIMEOUT_SECS kills the child AT the ttl.
+#[test]
+fn claude_ttl_bounds_the_subprocess_timeout() {
+    let _g = claude_env_lock();
+    let f = FakeClaude::new("ttl", r#"{"type":"result","result":"ok"}"#);
+    set_env("PHEOBE_FAKE_SLEEP", "5");
+    let ctx = crate::worker::WorkerCtx {
+        ttl: Some(std::time::Duration::from_secs(1)),
+        ..Default::default()
+    };
+    let t0 = std::time::Instant::now();
+    let err = run_fake_ctx(&f, &ctx).unwrap_err().to_string();
+    assert!(err.contains("timed out after 1s"), "{err}");
+    assert!(
+        t0.elapsed() < std::time::Duration::from_secs(4),
+        "killed at the ttl, not after the sleep"
+    );
+    std::fs::remove_dir_all(&f.dir).ok();
+}
+
+/// PHEOBE-43: a real moderate run under bwrap — bin and worktree both under /tmp,
+/// which also pins the mount order (a late --tmpfs /tmp would hide them).
+#[test]
+fn claude_moderate_runs_under_bwrap() {
+    if !std::path::Path::new("/usr/bin/bwrap").exists() {
+        eprintln!("skip: no bwrap");
+        return;
+    }
+    let _g = claude_env_lock();
+    let f = FakeClaude::new("bwrap", r#"{"type":"result","result":"sandboxed ok"}"#);
+    let ctx = crate::worker::WorkerCtx {
+        sandbox: Some(crate::sandbox::Tier::Moderate),
+        ..Default::default()
+    };
+    let out = run_fake_ctx(&f, &ctx).unwrap();
+    assert_eq!(out.final_text, "sandboxed ok");
+    assert_eq!(
+        f.argv().last().unwrap(),
+        &f.dir.display().to_string(),
+        "cwd = worktree inside the sandbox"
+    );
+    std::fs::remove_dir_all(&f.dir).ok();
+}

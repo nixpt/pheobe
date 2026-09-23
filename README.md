@@ -72,14 +72,17 @@ The report is the only contract an adopter should consume:
 }
 ```
 
-`done_when` accepts `command`, `files_exist` and `git_diff_matches`; there is
-no `manual` — a run never ends on vibes.
+`done_when` accepts `command` (`{"type":"command","run":…,"expect_exit":0}`)
+and `files_exist` (`{"type":"files_exist","paths":[…]}`, relative to the
+worktree); there is no `manual` — a run never ends on vibes.
+(`git_diff_matches`, advertised here before PHEOBE-44, was never
+implemented and is no longer claimed.)
 
 ## Commands
 
 | command | what it does |
 |---|---|
-| `pheobe run <task.json\|->` | the loop, self mode; report on stdout |
+| `pheobe run <task.json\|->` | the loop, self mode; ONE JSON report on stdout, always — exit `0` ok, `1` ran but `ok:false`, `2` never ran (intake/provision error, reason in `blocked`) |
 | `pheobe verify <task.json>` | `done_when` + path-allowlist gate only; exit 0/1 |
 | `pheobe host setup <task.json>` | host supervisor: intake + worktree + empty plan; JSON `{ok, worktree, branch, task}` |
 | `pheobe host finish <task.json>` | host supervisor: `done_when` + allowlist in `--worktree` (cwd default); JSON; exit 0/1 |
@@ -102,7 +105,14 @@ Everything is environment-driven; there is no config file.
 | `PHEOBE_SANDBOX` | `strict` \| `moderate` \| `free` (bwrap tiers; env wins over the task's `sandbox`) | `moderate` |
 | `PHEOBE_MEMORY` | `none` \| `local` \| `host` (host = a joker-mcp memory store) | `local` |
 | `PHEOBE_KEEP_WORKTREE` | `1` / `true` / `yes` — leave a failed-run worktree on disk | unset (tear down on early `run` error) |
-| `PHEOBE_<PROVIDER>_BIN` / `_FLAGS` / `_TIMEOUT_SECS` | per-adapter binary, extra flags, wall-clock cap | adapter default |
+| `PHEOBE_<PROVIDER>_BIN` / `_FLAGS` / `_TIMEOUT_SECS` | per-adapter binary, extra flags, wall-clock cap (claude: effective cap = min(this, task `ttl`)) | adapter default |
+| `PHEOBE_CLAUDE_MODEL` | claude worker model, appended as `--model` (keeps `_FLAGS`); wins over the task's `model` | unset (task `model`, else the CLI's default) |
+
+The claude worker honours the sandbox tier for the WHOLE engine run:
+`moderate` = bwrap with the network shared, `$HOME` read-only except
+`~/.claude`, writes confined to the worktree + its repo's git store (+
+`$CARGO_TARGET_DIR`); `strict` is refused (the CLI needs the network for its
+API); `free` = plain subprocess.
 
 ## Adoption kits
 
