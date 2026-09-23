@@ -211,7 +211,7 @@ fn plain(bin: &str, argv: &[String]) -> Command {
     c
 }
 
-fn which(name: &str) -> Option<PathBuf> {
+pub(crate) fn which(name: &str) -> Option<PathBuf> {
     std::env::var_os("PATH").and_then(|paths| {
         std::env::split_paths(&paths)
             .map(|d| d.join(name))
@@ -233,7 +233,7 @@ pub(crate) struct Mounts {
 }
 
 impl Mounts {
-    fn for_worktree(wt: &Path) -> Self {
+    pub(crate) fn for_worktree(wt: &Path) -> Self {
         let git = |arg: &str| {
             Command::new("git")
                 .arg("-C")
@@ -323,7 +323,7 @@ pub(crate) fn moderate_bwrap_args(
 
 /// Token total for the budget estimator: the sum of the usage buckets claude
 /// reports on its result object (input + output + both cache classes).
-fn sum_usage(usage: &Value) -> Option<u64> {
+pub(crate) fn sum_usage(usage: &Value) -> Option<u64> {
     const KEYS: [&str; 4] = [
         "input_tokens",
         "output_tokens",
@@ -374,6 +374,7 @@ fn parse_stdout(raw: &str) -> (WorkerOutcome, bool) {
             tokens: None,
             usd: None,
             json_tail: None,
+            turns: None,
         },
         false,
     )
@@ -403,6 +404,7 @@ fn from_result_object(v: &Value) -> (WorkerOutcome, bool) {
             tokens,
             usd,
             json_tail,
+            turns: None,
         },
         is_error,
     )

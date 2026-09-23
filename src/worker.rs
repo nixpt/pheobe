@@ -29,6 +29,9 @@ pub struct WorkerOutcome {
     /// Handoff-shaped JSON the adapter extracted from the engine's tail
     /// (e.g. a final `{"ok":..,"summary":..}` block), if any.
     pub json_tail: Option<Value>,
+    /// Engine turns, when the engine reports them (claude-sdk: `num_turns`).
+    /// `None` = one opaque worker call (the report then counts 1).
+    pub turns: Option<u32>,
 }
 
 /// The engine's final message may itself be the handoff contract: bare
@@ -82,6 +85,11 @@ pub struct WorkerCtx {
     pub ttl: Option<std::time::Duration>,
     /// The resolved sandbox tier (`PHEOBE_SANDBOX` → task → moderate).
     pub sandbox: Option<crate::sandbox::Tier>,
+    /// The task's `paths_allow` — adapters that can see individual tool calls
+    /// (claude-sdk) enforce it per call, not only at the post-run gate.
+    pub paths_allow: Vec<String>,
+    /// The task's `budget.max_usd`, for adapters that can cap cost themselves.
+    pub max_usd: Option<f64>,
 }
 
 /// One prompt out, one whole run back. The engine owns its internal loop;
@@ -102,6 +110,10 @@ type WorkerFactory = fn() -> Result<Arc<dyn Worker>>;
 const REGISTRY: &[(&str, WorkerFactory)] = &[
     ("opencode", crate::worker_opencode::worker as WorkerFactory), // PHEOBE-4
     ("claude", crate::worker_claude::worker as WorkerFactory),     // PHEOBE-5
+    (
+        "claude-sdk",
+        crate::worker_claude_sdk::worker as WorkerFactory,
+    ), // PHEOBE-45
     ("codex", crate::worker_codex::worker as WorkerFactory),       // PHEOBE-7
     ("cursor", crate::worker_cursor::worker as WorkerFactory),     // PHEOBE-6
     ("kimi", crate::worker_kimi::worker as WorkerFactory),         // PHEOBE-8

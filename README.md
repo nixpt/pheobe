@@ -101,18 +101,52 @@ Everything is environment-driven; there is no config file.
 | variable | values | default |
 |---|---|---|
 | `PHEOBE_BASE_URL` / `PHEOBE_MODEL` / `PHEOBE_API_KEY` | the self-mode endpoint | — |
-| `PHEOBE_PROVIDER` | `openai` (built-in turn loop) or a worker adapter: `opencode`, `claude`, `codex`, `cursor`, `kimi`, `agy` | `openai` |
+| `PHEOBE_PROVIDER` | `openai` (built-in turn loop) or a worker adapter: `opencode`, `claude`, `claude-sdk`, `codex`, `cursor`, `kimi`, `agy` | `openai` |
 | `PHEOBE_SANDBOX` | `strict` \| `moderate` \| `free` (bwrap tiers; env wins over the task's `sandbox`) | `moderate` |
 | `PHEOBE_MEMORY` | `none` \| `local` \| `host` (host = a joker-mcp memory store) | `local` |
 | `PHEOBE_KEEP_WORKTREE` | `1` / `true` / `yes` — leave a failed-run worktree on disk | unset (tear down on early `run` error) |
 | `PHEOBE_<PROVIDER>_BIN` / `_FLAGS` / `_TIMEOUT_SECS` | per-adapter binary, extra flags, wall-clock cap (claude: effective cap = min(this, task `ttl`)) | adapter default |
 | `PHEOBE_CLAUDE_MODEL` | claude worker model, appended as `--model` (keeps `_FLAGS`); wins over the task's `model` | unset (task `model`, else the CLI's default) |
+| `PHEOBE_CLAUDE_SDK_ALLOW` | claude-sdk: comma list of extra tools to allow outright (e.g. `WebFetch`) | unset |
+| `PHEOBE_CLAUDE_SDK_GRACE_SECS` | claude-sdk: seconds to wait for a result after the TTL `interrupt` before killing | `10` |
 
 The claude worker honours the sandbox tier for the WHOLE engine run:
 `moderate` = bwrap with the network shared, `$HOME` read-only except
 `~/.claude`, writes confined to the worktree + its repo's git store (+
 `$CARGO_TARGET_DIR`); `strict` is refused (the CLI needs the network for its
 API); `free` = plain subprocess.
+
+### The `claude-sdk` worker (PHEOBE-45)
+
+`PHEOBE_PROVIDER=claude-sdk` drives the same claude CLI the way the Claude
+Agent SDK does, over its stream-json control protocol
+(`--input-format stream-json --output-format stream-json
+--permission-prompt-tool stdio --setting-sources=`), with pheobe answering every
+permission request. It **never** passes `--dangerously-skip-permissions`.
+
+| tool call | pheobe's answer |
+|---|---|
+| `Write` / `Edit` / `MultiEdit` / `NotebookEdit` | allow only inside the worktree ∩ `paths_allow` |
+| `Bash` | deny destructive commands (safe-exec), `git push`, `gh pr merge`, recursive `rm` outside the worktree, and **shell writes** (`>`/`>>`, `tee`, `cp`/`mv`/`install`/`ln` destinations, `touch`/`mkdir`) outside the worktree ∩ `paths_allow`; otherwise allow |
+| `Read` / `Grep` / `Glob` / `LS` / `NotebookRead` | PreToolUse hook: allow inside the worktree or its main checkout, deny elsewhere |
+| anything else | deny unless on the allowlist (`TodoWrite`, `BashOutput`, `KillBash`, `KillShell`, + `PHEOBE_CLAUDE_SDK_ALLOW`) |
+
+Every decision is reported: denials land in the handoff's `doubts`, with a
+`N allowed, M denied` line. `usage.usd` is the CLI's real `total_cost_usd`,
+`usage.turns` its `num_turns`, and `budget.max_usd` becomes `--max-budget-usd`
+(an overrun result still blocks). At the TTL, pheobe sends `interrupt`, waits
+`PHEOBE_CLAUDE_SDK_GRACE_SECS` for the result, then kills. `--setting-sources=`
+keeps the host's `~/.claude` hooks and settings out of the worker.
+
+The Bash write screen is a best-effort parse. Run-level `paths_allow` gating
+(the allowlist check after the engine finishes) stays the mechanical backstop
+for writes a parse can't see.
+
+**Protocol dependency:** this is the SDK's internal wire contract, not a
+documented public API. `tests/fixtures/claude-stream-json.jsonl` (a scrubbed
+real transcript) is the conformance test; re-run the suite, and the live test
+(`PHEOBE_LIVE_CLAUDE=1 cargo test live_claude_sdk -- --ignored`), when the claude
+CLI version moves. The subprocess `claude` worker stays as the fallback.
 
 ## Adoption kits
 

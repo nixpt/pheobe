@@ -160,6 +160,7 @@ pub(crate) fn parse_stdout(raw: &str) -> (WorkerOutcome, bool) {
             tokens: None,
             usd: None,
             json_tail: None,
+            turns: None,
         },
         false,
     )
@@ -188,6 +189,7 @@ fn from_result_object(v: &Value) -> (WorkerOutcome, bool) {
             tokens,
             usd: None,
             json_tail,
+            turns: None,
         },
         is_err,
     )

@@ -137,12 +137,14 @@ fn parse_stdout(stdout: &str) -> WorkerOutcome {
             tokens: usage_tokens(&v),
             usd: usage_usd(&v),
             json_tail: Some(v),
+            turns: None,
         },
         None => WorkerOutcome {
             final_text: stdout.trim().to_string(),
             tokens: None,
             usd: None,
             json_tail: None,
+            turns: None,
         },
     }
 }
