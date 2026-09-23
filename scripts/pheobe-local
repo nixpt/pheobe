@@ -1,0 +1,281 @@
+#!/usr/bin/env bash
+# pheobe-local — serve a local model for pheobe's self mode / ACP, prove it
+# renders tools, and hand pheobe the endpoint env. See docs/LOCAL_MODELS.md.
+#
+# Registry: one KEY=VALUE file per model in $PHEOBE_LOCAL_DIR/models.d/NAME.env
+# (default ~/.pheobe/models.d). Engines: llama (llama-server) and vllm.
+set -euo pipefail
+
+die() { printf 'pheobe-local: %s\n' "$*" >&2; exit 1; }
+usage() {
+    cat <<'EOF'
+Usage: scripts/pheobe-local COMMAND [ARGS...]
+
+Commands:
+  init                     Create the registry dir with a commented example entry
+  list                     Registry entries (* = serving now)
+  serve NAME               Start NAME's engine (reuses a healthy one), wait for
+                           health, print the env exports. Stops another entry's
+                           engine first — local GPUs are single-tenant.
+  stop [NAME]              Stop the serving engine (default: whichever is current)
+  status                   Current entry, health, pid, GPU memory
+  env NAME                 Print `export PHEOBE_BASE_URL=… PHEOBE_MODEL=…` (eval it)
+  smoke NAME               Tool-call probe: structured tool_calls? Does the server
+                           render tool schemas into the prompt (prompt_tokens delta)?
+  run NAME TASK.json [ARGS...]
+                           serve NAME if needed, export env, exec `pheobe run`
+  logs NAME [-n N]         Tail the engine log
+
+Entry keys (NAME.env): ENGINE=llama|vllm  MODEL  ALIAS  PORT  CTX  DRAFT
+  GPU_LAYERS  THINKING=off|on  TOOL_PARSER  REASONING_PARSER  GPU_MEM  VLLM_BIN
+  LLAMA_BIN  EXTRA_ARGS  NOTES   (run `init` for the annotated example)
+EOF
+}
+
+root="${PHEOBE_LOCAL_DIR:-$HOME/.pheobe}"
+reg="$root/models.d"
+state="$root/local"
+
+# ── registry ────────────────────────────────────────────────────────────────
+entry_file() { printf '%s/%s.env\n' "$reg" "$1"; }
+
+load_entry() {
+    local name="$1" f
+    f="$(entry_file "$name")"
+    [[ -f "$f" ]] || die "no entry '$name' in $reg (see: $0 list | init)"
+    # defaults, then the file (KEY=VALUE only; no shell expansion tricks)
+    ENGINE=llama MODEL= ALIAS="$name" PORT=8081 CTX=16384 DRAFT= GPU_LAYERS=99
+    THINKING=off TOOL_PARSER=hermes REASONING_PARSER= GPU_MEM=0.90
+    VLLM_BIN=vllm LLAMA_BIN=llama-server EXTRA_ARGS= NOTES=
+    local line k v
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%%#*}"; line="${line#"${line%%[![:space:]]*}"}"
+        [[ -z "$line" ]] && continue
+        k="${line%%=*}"; v="${line#*=}"
+        v="${v#\"}"; v="${v%\"}"
+        case "$k" in
+            ENGINE|MODEL|ALIAS|PORT|CTX|DRAFT|GPU_LAYERS|THINKING|TOOL_PARSER|\
+            REASONING_PARSER|GPU_MEM|VLLM_BIN|LLAMA_BIN|EXTRA_ARGS|NOTES) printf -v "$k" '%s' "$v" ;;
+            *) die "$f: unknown key '$k'" ;;
+        esac
+    done < "$f"
+    [[ -n "$MODEL" ]] || die "$f: MODEL is required"
+    case "$ENGINE" in llama|vllm) ;; *) die "$f: ENGINE must be llama or vllm" ;; esac
+    BASE_URL="http://127.0.0.1:$PORT/v1"
+}
+
+cmd_init() {
+    mkdir -p "$reg" "$state"
+    local ex="$reg/example.env.disabled"
+    [[ -e "$ex" ]] && { echo "registry: $reg (example already present)"; return; }
+    cat > "$ex" <<'EOF'
+# pheobe-local registry entry. Rename to NAME.env to enable; `pheobe-local list`.
+# One model per file. Values are plain strings — no shell expansion.
+ENGINE=llama                      # llama (llama-server) | vllm
+MODEL=/models/gemma-4-12B-it-Q4_K_XL.gguf   # llama: GGUF path · vllm: HF id or dir
+ALIAS=gemma4-12b                  # served model name; becomes PHEOBE_MODEL
+PORT=8081
+CTX=16384                         # llama: -c (ONE slot, -np 1) · vllm: --max-model-len
+DRAFT=/models/mtp-gemma-4-12B-it.gguf   # llama only: MTP/draft GGUF → --spec-type draft-mtp
+GPU_LAYERS=99                     # llama only: -ngl
+THINKING=off                      # off → enable_thinking=false via chat-template kwargs
+# vllm only:
+# TOOL_PARSER=qwen3_xml           # Qwen3.5 emits Qwen3-Coder XML; hermes silently drops it
+# REASONING_PARSER=qwen3
+# GPU_MEM=0.93                    # --gpu-memory-utilization
+# VLLM_BIN=/path/to/venv/bin/vllm
+# EXTRA_ARGS=--enforce-eager --max-num-seqs 2 --max-num-batched-tokens 4096
+NOTES=12 GB VRAM: 7.8 GB with the draft; ~137 tok/s at 82% acceptance
+EOF
+    echo "registry: $reg — example written to $ex"
+}
+
+cmd_list() {
+    [[ -d "$reg" ]] || die "no registry at $reg (run: $0 init)"
+    local cur="" f name mark
+    [[ -f "$state/current" ]] && cur="$(cat "$state/current")"
+    shopt -s nullglob
+    for f in "$reg"/*.env; do
+        name="$(basename "$f" .env)"
+        load_entry "$name"
+        mark=" "; [[ "$name" == "$cur" ]] && healthy && mark="*"
+        printf '%s %-14s %-6s port %-5s %s%s\n' "$mark" "$name" "$ENGINE" "$PORT" "$MODEL" "${DRAFT:+  +draft}"
+    done
+}
+
+# ── engine control ──────────────────────────────────────────────────────────
+healthy() { curl -sf -m 3 "$BASE_URL/models" >/dev/null 2>&1; }
+port_listening() { { command -v ss >/dev/null && ss -ltn 2>/dev/null | grep -q ":$PORT "; } || curl -s -m 1 "$BASE_URL/models" >/dev/null 2>&1; }
+pid_of() { local p="$state/$1.pid"; [[ -f "$p" ]] && cat "$p"; }
+alive() { [[ -n "${1:-}" ]] && kill -0 "$1" 2>/dev/null; }
+
+engine_argv() {
+    # sets ARGV (array) for the entry currently loaded
+    case "$ENGINE" in
+    llama)
+        ARGV=("$LLAMA_BIN" -m "$MODEL" --host 127.0.0.1 --port "$PORT" -ngl "$GPU_LAYERS"
+              -c "$CTX" -np 1 --jinja --alias "$ALIAS")
+        [[ -n "$DRAFT" ]] && ARGV+=(-md "$DRAFT" --spec-type draft-mtp)
+        [[ "$THINKING" == off ]] && ARGV+=(--chat-template-kwargs '{"enable_thinking": false}')
+        ;;
+    vllm)
+        ARGV=("$VLLM_BIN" serve "$MODEL" --host 127.0.0.1 --port "$PORT" --served-model-name "$ALIAS"
+              --max-model-len "$CTX" --gpu-memory-utilization "$GPU_MEM"
+              --enable-auto-tool-choice --tool-call-parser "$TOOL_PARSER"
+              --limit-mm-per-prompt '{"image": 0, "video": 0}')
+        [[ -n "$REASONING_PARSER" ]] && ARGV+=(--reasoning-parser "$REASONING_PARSER")
+        [[ "$THINKING" == off ]] && ARGV+=(--default-chat-template-kwargs '{"enable_thinking": false}')
+        ;;
+    esac
+    # EXTRA_ARGS is split on whitespace by design — quote-free flags only
+    # shellcheck disable=SC2206
+    [[ -n "$EXTRA_ARGS" ]] && ARGV+=($EXTRA_ARGS)
+    return 0
+}
+
+wait_healthy() {
+    local pid="$1" deadline=$(( $(date +%s) + ${2:-600} ))
+    until healthy; do
+        alive "$pid" || return 1
+        (( $(date +%s) < deadline )) || return 2
+        sleep 2
+    done
+}
+
+cmd_stop() {
+    local name="${1:-}" cur="" pid
+    [[ -f "$state/current" ]] && cur="$(cat "$state/current")"
+    name="${name:-$cur}"
+    [[ -n "$name" ]] || { echo "nothing is serving"; return 0; }
+    pid="$(pid_of "$name" || true)"
+    if alive "$pid"; then
+        kill "$pid"
+        local i=0; while alive "$pid" && (( i < 60 )); do sleep 1; i=$((i+1)); done
+        alive "$pid" && die "$name (pid $pid) did not exit in 60 s — not SIGKILLing a CUDA process; do it yourself"
+        echo "stopped $name (pid $pid)"
+    else
+        echo "$name: no live pid"
+    fi
+    rm -f "$state/$name.pid"
+    [[ "$cur" == "$name" ]] && rm -f "$state/current"
+    return 0
+}
+
+cmd_serve() {
+    local name="$1" cur="" pid
+    load_entry "$name"
+    mkdir -p "$state"
+    [[ -f "$state/current" ]] && cur="$(cat "$state/current")"
+    if [[ "$cur" == "$name" ]] && alive "$(pid_of "$name" || true)" && healthy; then
+        echo "$name already serving on $BASE_URL (pid $(pid_of "$name"))" >&2
+        cmd_env "$name"; return 0
+    fi
+    if [[ -n "$cur" && "$cur" != "$name" ]]; then
+        echo "stopping $cur first (single-tenant GPU)" >&2
+        cmd_stop "$cur" >&2
+    fi
+    port_listening && die "port $PORT is already in use by something pheobe-local did not start"
+    case "$ENGINE" in
+        llama) [[ -e "$MODEL" ]] || die "MODEL not found: $MODEL"
+               [[ -z "$DRAFT" || -e "$DRAFT" ]] || die "DRAFT not found: $DRAFT" ;;
+    esac
+    engine_argv
+    local log="$state/$name.log"
+    printf '# %s\n# argv: %q' "$(date -Is)" "${ARGV[0]}" > "$log"
+    printf ' %q' "${ARGV[@]:1}" >> "$log"; printf '\n' >> "$log"
+    HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}" nohup "${ARGV[@]}" >> "$log" 2>&1 &
+    pid=$!
+    printf '%s\n' "$pid" > "$state/$name.pid"
+    printf '%s\n' "$name" > "$state/current"
+    echo "starting $name ($ENGINE, pid $pid) — log: $log" >&2
+    if ! wait_healthy "$pid" "${PHEOBE_LOCAL_TIMEOUT:-600}"; then
+        rm -f "$state/$name.pid" "$state/current"
+        echo "--- last log lines ---" >&2; tail -n 15 "$log" >&2
+        die "$name did not become healthy (engine died or timed out)"
+    fi
+    echo "$name serving on $BASE_URL" >&2
+    cmd_env "$name"
+}
+
+cmd_status() {
+    local cur="" pid
+    [[ -f "$state/current" ]] && cur="$(cat "$state/current")"
+    [[ -n "$cur" ]] || { echo "current: none"; return 0; }
+    load_entry "$cur"; pid="$(pid_of "$cur" || true)"
+    printf 'current: %s  engine: %s  url: %s\n' "$cur" "$ENGINE" "$BASE_URL"
+    printf 'pid: %s (%s)  health: %s\n' "${pid:-?}" "$(alive "$pid" && echo alive || echo dead)" "$(healthy && echo ok || echo DOWN)"
+    command -v nvidia-smi >/dev/null && nvidia-smi --query-gpu=memory.used,memory.total --format=csv,noheader | sed 's/^/gpu: /'
+    return 0
+}
+
+cmd_env() {
+    load_entry "$1"
+    printf 'export PHEOBE_BASE_URL=%q PHEOBE_MODEL=%q PHEOBE_API_KEY=%q\n' "$BASE_URL" "$ALIAS" "${PHEOBE_API_KEY:-none}"
+}
+
+cmd_logs() {
+    local name="$1"; shift || true
+    load_entry "$name"
+    [[ $# -gt 0 ]] || set -- -n 40
+    tail "$@" "$state/$name.log"
+}
+
+# ── the tool-call probe ─────────────────────────────────────────────────────
+cmd_smoke() {
+    load_entry "$1"
+    healthy || die "$1 is not serving on $BASE_URL (run: $0 serve $1)"
+    command -v python3 >/dev/null || die "smoke needs python3"
+    python3 - "$BASE_URL" "$ALIAS" <<'PY'
+import json, sys, time, urllib.request
+base, model = sys.argv[1], sys.argv[2]
+tool = {"type": "function", "function": {"name": "get_weather", "description": "Get weather for a city",
+        "parameters": {"type": "object", "properties": {"city": {"type": "string"}}, "required": ["city"]}}}
+msg = [{"role": "user", "content": "What is the weather in Kathmandu? Use the tool."}]
+def chat(body):
+    req = urllib.request.Request(base + "/chat/completions", data=json.dumps(body).encode(),
+                                 headers={"content-type": "application/json"})
+    t0 = time.time()
+    with urllib.request.urlopen(req, timeout=300) as r:
+        return json.load(r), time.time() - t0
+with_tools, dt = chat({"model": model, "messages": msg, "tools": [tool], "max_tokens": 200})
+without, _ = chat({"model": model, "messages": msg, "max_tokens": 1})
+c = with_tools["choices"][0]; m = c["message"]; calls = m.get("tool_calls") or []
+pt_with = with_tools["usage"]["prompt_tokens"]; pt_without = without["usage"]["prompt_tokens"]
+renders = pt_with > pt_without
+structured = bool(calls) and all(x.get("type") == "function" and x.get("function", {}).get("name") for x in calls)
+print(f"finish_reason:    {c['finish_reason']}")
+print(f"tool_calls:       {json.dumps(calls)[:160] if calls else 'NONE'}")
+print(f"content:          {repr((m.get('content') or '')[:120])}")
+print(f"prompt_tokens:    {pt_with} with tools vs {pt_without} without  (delta {pt_with - pt_without})")
+print(f"renders tools:    {'yes' if renders else 'NO — schemas never reach the model (zorro serve @0.43 does this; see ZORRO-020)'}")
+print(f"structured calls: {'yes' if structured else 'NO — ' + ('call left in content as text (wrong --tool-call-parser? Qwen3.5 needs qwen3_xml on vLLM)' if renders and '<' in (m.get('content') or '') else 'model answered in prose')}")
+print(f"latency:          {dt:.2f}s")
+sys.exit(0 if renders and structured else 1)
+PY
+}
+
+cmd_run() {
+    local name="$1"; shift
+    [[ $# -ge 1 ]] || die "run NAME TASK.json [pheobe run args]"
+    cmd_serve "$name" >/dev/null
+    load_entry "$name"
+    export PHEOBE_BASE_URL="$BASE_URL" PHEOBE_MODEL="$ALIAS" PHEOBE_API_KEY="${PHEOBE_API_KEY:-none}"
+    exec pheobe run "$@"
+}
+
+# ── dispatch ────────────────────────────────────────────────────────────────
+[[ $# -gt 0 ]] || { usage >&2; exit 1; }
+cmd="$1"; shift
+case "$cmd" in
+    -h|--help) usage ;;
+    init)   cmd_init ;;
+    list)   cmd_list ;;
+    serve)  [[ $# -eq 1 ]] || die "serve NAME"; cmd_serve "$1" ;;
+    stop)   cmd_stop "${1:-}" ;;
+    status) cmd_status ;;
+    env)    [[ $# -eq 1 ]] || die "env NAME"; cmd_env "$1" ;;
+    smoke)  [[ $# -eq 1 ]] || die "smoke NAME"; cmd_smoke "$1" ;;
+    run)    [[ $# -ge 2 ]] || die "run NAME TASK.json [args]"; cmd_run "$@" ;;
+    logs)   [[ $# -ge 1 ]] || die "logs NAME [-n N]"; cmd_logs "$@" ;;
+    *) die "unknown command: $cmd (see --help)" ;;
+esac
