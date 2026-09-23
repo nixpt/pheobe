@@ -353,6 +353,7 @@ mod tests {
             paths_allow: vec![],
             push: false,
             sandbox: Some("free".into()),
+            model: None,
         };
         // task says free, but env overrides to strict
         unsafe { std::env::set_var("PHEOBE_SANDBOX", "strict") };

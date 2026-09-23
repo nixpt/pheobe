@@ -204,8 +204,9 @@ The broader picture confirms the decline and sharpens two points:
 }
 ```
 
-- `done_when` reuses mayfly's kinds (`command`, `files_exist`,
-  `git_diff_matches`; `manual` stays forbidden). It is the verify stage's
+- `done_when` reuses mayfly's kinds (`command`, `files_exist` — PHEOBE-44;
+  `git_diff_matches` was planned, never implemented, and dropped; `manual`
+  stays forbidden). It is the verify stage's
   success oracle, not just a watcher's exit condition — pheobe *drives*
   toward it rather than polling it.
 - `worktree: true` (default) shells out to `kitchen` when present, else

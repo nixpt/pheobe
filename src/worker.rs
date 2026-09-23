@@ -72,10 +72,27 @@ pub fn extract_json_tail(final_text: &str) -> Option<Value> {
     None
 }
 
+/// Per-run knobs a worker MAY honour (PHEOBE-41/43). Adapters that ignore
+/// them keep working unchanged: `run_with` defaults to `run`.
+#[derive(Debug, Clone, Default)]
+pub struct WorkerCtx {
+    /// Engine model id (task `model`, or the adapter's own env override).
+    pub model: Option<String>,
+    /// The task's ttl: an adapter's subprocess timeout should not outlive it.
+    pub ttl: Option<std::time::Duration>,
+    /// The resolved sandbox tier (`PHEOBE_SANDBOX` → task → moderate).
+    pub sandbox: Option<crate::sandbox::Tier>,
+}
+
 /// One prompt out, one whole run back. The engine owns its internal loop;
 /// pheobe owns everything mechanical around it (aging ladder, budget, gates).
 pub trait Worker {
     fn run(&self, prompt: &str, worktree: &Path) -> Result<WorkerOutcome>;
+
+    /// `run` with per-run knobs. Default: ignore them (adapters opt in).
+    fn run_with(&self, prompt: &str, worktree: &Path, _ctx: &WorkerCtx) -> Result<WorkerOutcome> {
+        self.run(prompt, worktree)
+    }
 }
 
 /// Registry: `PHEOBE_PROVIDER` name → worker constructor. Adapters
