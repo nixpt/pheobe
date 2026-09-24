@@ -66,8 +66,79 @@ pub fn next_free_branch(repo: &Path, base: &str) -> Result<String> {
     bail!("branch '{base}' and 99 suffixed variants all exist — clean up with `kitchen list`")
 }
 
+/// The line pheobe keeps in a worktree's git exclude file.
+pub const EXCLUDE_LINE: &str = "/.pheobe/";
+
+/// Make every git command run in `wt` ignore pheobe's sidecar dir (PHEOBE-48).
+///
+/// pheobe's own commit already excludes `:!/.pheobe`, but an engine that commits
+/// by itself (`git add -A && git commit`) used to sweep `.pheobe/plan.json` in
+/// (s463: foreman-v9 57d13fe). The exclude file is resolved with
+/// `git rev-parse --git-path info/exclude` from inside the worktree. For a linked
+/// worktree that's the clone's shared exclude, which is clone-local and never
+/// committed. The repo's tracked `.gitignore` is not touched. Idempotent.
+pub fn ensure_pheobe_excluded(wt: &Path) -> Result<PathBuf> {
+    let rel = run(Command::new("git").arg("-C").arg(wt).args([
+        "rev-parse",
+        "--git-path",
+        "info/exclude",
+    ]))?;
+    let path = {
+        let p = PathBuf::from(rel.trim());
+        if p.is_absolute() {
+            p
+        } else {
+            wt.join(p)
+        }
+    };
+    let existing = std::fs::read_to_string(&path).unwrap_or_default();
+    if existing.lines().any(|l| l.trim() == EXCLUDE_LINE) {
+        return Ok(path);
+    }
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    let mut body = existing;
+    if !body.is_empty() && !body.ends_with('\n') {
+        body.push('\n');
+    }
+    body.push_str(EXCLUDE_LINE);
+    body.push('\n');
+    std::fs::write(&path, body)?;
+    Ok(path)
+}
+
+/// Commits since `base` that nonetheless carry `.pheobe/` (e.g. an engine used
+/// `git add -f`): returned as "<sha> <path>" for the report's doubts.
+pub fn commits_touching_pheobe(wt: &Path, base: &str) -> Result<Vec<String>> {
+    let out = run(Command::new("git").arg("-C").arg(wt).args([
+        "log",
+        "--format=%h",
+        "--name-only",
+        &format!("{base}..HEAD"),
+        "--",
+        ".pheobe",
+    ]))?;
+    let mut hits = Vec::new();
+    let mut sha = String::new();
+    for line in out.lines().map(str::trim).filter(|l| !l.is_empty()) {
+        if line.starts_with(".pheobe") {
+            hits.push(format!("{sha} {line}"));
+        } else {
+            sha = line.to_string();
+        }
+    }
+    Ok(hits)
+}
+
 /// Provision an isolated working copy. Returns (worktree path, branch).
 pub fn provision(repo: &Path, branch: &str) -> Result<(PathBuf, String)> {
+    let (wt, branch) = provision_raw(repo, branch)?;
+    ensure_pheobe_excluded(&wt)?;
+    Ok((wt, branch))
+}
+
+fn provision_raw(repo: &Path, branch: &str) -> Result<(PathBuf, String)> {
     if !is_source_checkout(repo) {
         // already a worktree — find the source repo and branch from it
         bail!("given repo is already a worktree; pass the source repo (kitchen resolves this)")
@@ -255,22 +326,41 @@ pub fn check_allowlist(wt: &Path, paths_allow: &[String]) -> Result<(Vec<String>
 /// Stage for commit — by pathspec when the task has an allowlist (issue 02:
 /// bash-created byproducts like `__pycache__/` must not sneak into the
 /// commit), `.pheobe` excluded unconditionally.
+/// Does `wt`'s git exclude carry pheobe's line (PHEOBE-48)?
+///
+/// Keyed on the exclude file pheobe itself writes, not `git check-ignore`:
+/// check-ignore answers "not ignored" in cases where `git add` still refuses a
+/// pathspec naming the path (seen in the run_task e2e test), so the two disagree.
+fn pheobe_excluded(wt: &Path) -> bool {
+    let Ok(rel) = run(Command::new("git").arg("-C").arg(wt).args([
+        "rev-parse",
+        "--git-path",
+        "info/exclude",
+    ])) else {
+        return false;
+    };
+    let p = PathBuf::from(rel.trim());
+    let path = if p.is_absolute() { p } else { wt.join(p) };
+    std::fs::read_to_string(path)
+        .map(|t| t.lines().any(|l| l.trim() == EXCLUDE_LINE))
+        .unwrap_or(false)
+}
+
 fn stage(wt: &Path, paths_allow: &[String]) -> Result<()> {
-    if paths_allow.is_empty() {
-        return run(Command::new("git").arg("-C").arg(wt).args([
-            "add",
-            "-A",
-            "--",
-            ".",
-            ":!/.pheobe",
-        ]))
-        .map(|_| ());
-    }
     let mut args = vec!["add".to_string(), "-A".to_string(), "--".to_string()];
-    for a in paths_allow {
-        args.push(a.trim_end_matches('/').to_string());
+    if paths_allow.is_empty() {
+        args.push(".".into());
+    } else {
+        for a in paths_allow {
+            args.push(a.trim_end_matches('/').to_string());
+        }
     }
-    args.push(":!/.pheobe".into());
+    // Belt-and-braces: exclude .pheobe by pathspec only when pheobe's exclude line
+    // isn't in place. Once it is, git rejects a pathspec naming the ignored path
+    // ("The following paths are ignored…", exit 1), so the two guards must not stack.
+    if !pheobe_excluded(wt) {
+        args.push(":!/.pheobe".into());
+    }
     run(Command::new("git").arg("-C").arg(wt).args(&args)).map(|_| ())
 }
 
