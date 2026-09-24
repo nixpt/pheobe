@@ -90,6 +90,7 @@ impl Worker for ClaudeWorker {
             worktree,
             ctx.sandbox.as_ref(),
             crate::engine::CLAUDE_HOME_RW,
+            crate::engine::CLAUDE_ENV_RW,
         )?;
         cmd.current_dir(worktree);
         cmd.stdin(Stdio::null());

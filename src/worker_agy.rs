@@ -99,6 +99,7 @@ impl Worker for AgyWorker {
             worktree,
             bwrap_tier.as_ref(),
             crate::engine::AGY_HOME_RW,
+            crate::engine::AGY_ENV_RW,
         )?;
         cmd.current_dir(worktree);
         cmd.stdin(std::process::Stdio::null());

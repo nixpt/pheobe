@@ -277,11 +277,18 @@ fn moderate_confinement_makes_only_the_engines_own_state_writable() {
 #[test]
 fn strict_is_refused_for_network_engines_and_free_is_plain() {
     for engine in ["opencode", "kimi", "agy"] {
-        let err =
-            crate::engine::command(engine, "x", &[], Path::new("/w"), Some(&Tier::Strict), &[])
-                .map(|_| ())
-                .unwrap_err()
-                .to_string();
+        let err = crate::engine::command(
+            engine,
+            "x",
+            &[],
+            Path::new("/w"),
+            Some(&Tier::Strict),
+            &[],
+            &[],
+        )
+        .map(|_| ())
+        .unwrap_err()
+        .to_string();
         assert!(
             err.contains(&format!(
                 "{engine} worker: sandbox 'strict' is not supported"
@@ -295,6 +302,7 @@ fn strict_is_refused_for_network_engines_and_free_is_plain() {
         &["-p".into()],
         Path::new("/w"),
         Some(&Tier::Free),
+        &[],
         &[],
     )
     .unwrap();

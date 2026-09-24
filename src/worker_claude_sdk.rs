@@ -115,7 +115,8 @@ fn command(bin: &str, argv: &[String], wt: &Path, tier: Option<Tier>) -> Result<
                     bin,
                     argv,
                     wt,
-                    &Mounts::for_worktree(wt),
+                    &Mounts::for_worktree(wt)
+                        .with_redirects("claude-sdk", crate::engine::CLAUDE_ENV_RW),
                 ));
                 c
             }

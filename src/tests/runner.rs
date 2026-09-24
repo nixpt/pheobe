@@ -100,6 +100,7 @@ fn moderate_bwrap_argv_shape() {
         git_common: Some(PathBuf::from("/r/.git")),
         repo_parent: Some(PathBuf::from("/p")),
         cargo_target: Some(PathBuf::from("/build/t")),
+        ..Default::default()
     };
     let a = moderate_bwrap_args(
         "/opt/fake/claude",
