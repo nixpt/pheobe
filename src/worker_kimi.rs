@@ -81,6 +81,7 @@ impl Worker for KimiWorker {
             worktree,
             ctx.sandbox.as_ref(),
             crate::engine::KIMI_HOME_RW,
+            crate::engine::KIMI_ENV_RW,
         )?;
         cmd.current_dir(worktree);
         cmd.stdin(Stdio::null());

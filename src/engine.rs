@@ -65,6 +65,10 @@ pub(crate) struct Mounts {
     /// the main checkout's parent, so sibling `../x` path-deps resolve (read-only)
     pub repo_parent: Option<PathBuf>,
     pub cargo_target: Option<PathBuf>,
+    /// env-redirected engine config dirs (e.g. `CLAUDE_CONFIG_DIR`), writable (PHEOBE-47)
+    pub config_rw: Vec<PathBuf>,
+    /// targets of symlinks inside those dirs that nothing else mounts, read-only
+    pub config_ro: Vec<PathBuf>,
 }
 
 impl Mounts {
@@ -90,8 +94,113 @@ impl Mounts {
                 .map(Path::to_path_buf),
             git_common,
             cargo_target: std::env::var_os("CARGO_TARGET_DIR").map(PathBuf::from),
+            config_rw: Vec::new(),
+            config_ro: Vec::new(),
         }
     }
+
+    /// Add the engine's env-redirected config dirs (read from the process env).
+    pub(crate) fn with_redirects(mut self, engine: &str, env_rw: &[&str]) -> Self {
+        let (rw, ro, log) = redirected_config(
+            env_rw,
+            &|v| std::env::var_os(v),
+            self.home.as_deref(),
+            &self.covered(),
+        );
+        for line in log {
+            eprintln!("pheobe: {engine} moderate sandbox: {line}");
+        }
+        self.config_rw = rw;
+        self.config_ro = ro;
+        self
+    }
+
+    /// Host paths this sandbox already makes visible (read-only or writable).
+    fn covered(&self) -> Vec<PathBuf> {
+        [
+            &self.home,
+            &self.repo_parent,
+            &self.git_common,
+            &self.git_dir,
+            &self.cargo_target,
+        ]
+        .into_iter()
+        .flatten()
+        .cloned()
+        .collect()
+    }
+}
+
+/// Env vars through which a caller relocates an engine's config/auth dir
+/// (PHEOBE-47). agent-launch's common agent home (s367) sets these to a dir under
+/// `.squad/state/agent-homes/<agent>/`, which the moderate sandbox did not mount —
+/// the engine came up "Not logged in" (s463 live dispatch). Verified per installed
+/// CLI: claude 2.1.281 reads `CLAUDE_CONFIG_DIR`; opencode 1.18.32 reads
+/// `OPENCODE_CONFIG_DIR`; kimi = cece reads `CECE_HOME` then `KIMI_SHARE_DIR`
+/// (cece/share.py) — not `CECE_SHARE_DIR`; agy reads none. codex/cursor run in their
+/// native sandbox, not this bwrap, so `CODEX_HOME` is not listed here.
+pub(crate) const CLAUDE_ENV_RW: &[&str] = &["CLAUDE_CONFIG_DIR"];
+pub(crate) const OPENCODE_ENV_RW: &[&str] = &["OPENCODE_CONFIG_DIR"];
+pub(crate) const KIMI_ENV_RW: &[&str] = &["CECE_HOME", "KIMI_SHARE_DIR"];
+pub(crate) const AGY_ENV_RW: &[&str] = &[];
+
+/// Resolve env-redirected config dirs into (writable dirs, read-only symlink
+/// targets, log lines). Only existing absolute dirs are bound; `/` and any dir
+/// that is `$HOME` or an ancestor of it are refused (never bind `$HOME` writable
+/// wholesale). A symlink inside a redirected dir (e.g. `.credentials.json` →
+/// `~/.claude/…`) must still resolve inside the sandbox: its target is bound
+/// read-only unless a path already mounted covers it.
+pub(crate) fn redirected_config(
+    env_rw: &[&str],
+    get: &dyn Fn(&str) -> Option<std::ffi::OsString>,
+    home: Option<&Path>,
+    covered: &[PathBuf],
+) -> (Vec<PathBuf>, Vec<PathBuf>, Vec<String>) {
+    let (mut rw, mut ro, mut log) = (Vec::<PathBuf>::new(), Vec::<PathBuf>::new(), Vec::new());
+    for var in env_rw {
+        let Some(raw) = get(var).filter(|v| !v.is_empty()) else {
+            continue;
+        };
+        let dir = PathBuf::from(&raw);
+        if !dir.is_absolute() || !dir.is_dir() {
+            log.push(format!(
+                "${var}={} is not an existing absolute dir — not bound",
+                dir.display()
+            ));
+            continue;
+        }
+        if dir == Path::new("/") || home.is_some_and(|h| h.starts_with(&dir)) {
+            log.push(format!(
+                "${var}={} would expose / or $HOME wholesale — not bound",
+                dir.display()
+            ));
+            continue;
+        }
+        if rw.contains(&dir) {
+            continue;
+        }
+        log.push(format!("binding ${var}={} (rw)", dir.display()));
+        if let Ok(entries) = std::fs::read_dir(&dir) {
+            for e in entries.flatten() {
+                let p = e.path();
+                let is_link = std::fs::symlink_metadata(&p)
+                    .map(|m| m.file_type().is_symlink())
+                    .unwrap_or(false);
+                let Some(target) = is_link.then(|| std::fs::canonicalize(&p).ok()).flatten() else {
+                    continue;
+                };
+                let reachable = target.starts_with(&dir)
+                    || rw.iter().any(|d| target.starts_with(d))
+                    || covered.iter().any(|c| target.starts_with(c));
+                if !reachable && !ro.contains(&target) {
+                    log.push(format!("  + {} → {} (ro)", p.display(), target.display()));
+                    ro.push(target);
+                }
+            }
+        }
+        rw.push(dir);
+    }
+    (rw, ro, log)
 }
 
 /// Per-engine state under `$HOME` that must stay writable inside the moderate
@@ -153,6 +262,14 @@ pub(crate) fn moderate_bwrap_args(
             add("--bind-try", &h.join(rel));
         }
     }
+    // env-redirected engine config dirs (PHEOBE-47): writable, after $HOME so a
+    // redirect under $HOME is not left read-only by the home bind above
+    for d in &m.config_rw {
+        add("--bind-try", d);
+    }
+    for t in &m.config_ro {
+        add("--ro-bind-try", t);
+    }
     if let Some(ro) = &m.repo_parent {
         add("--ro-bind-try", ro);
     }
@@ -183,6 +300,7 @@ pub(crate) fn command(
     wt: &Path,
     tier: Option<&Tier>,
     home_rw: &[&str],
+    env_rw: &[&str],
 ) -> anyhow::Result<Command> {
     Ok(match tier {
         None | Some(Tier::Free) => plain(bin, argv),
@@ -194,7 +312,7 @@ pub(crate) fn command(
                     bin,
                     argv,
                     wt,
-                    &Mounts::for_worktree(wt),
+                    &Mounts::for_worktree(wt).with_redirects(engine, env_rw),
                     home_rw,
                 ));
                 c

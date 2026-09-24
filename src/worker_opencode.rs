@@ -109,6 +109,7 @@ impl Worker for OpenCodeWorker {
             worktree,
             ctx.sandbox.as_ref(),
             crate::engine::OPENCODE_HOME_RW,
+            crate::engine::OPENCODE_ENV_RW,
         )?;
         cmd.current_dir(worktree);
         cmd.stdout(std::process::Stdio::piped());

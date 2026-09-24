@@ -133,6 +133,14 @@ everywhere. `usage.turns` is the engine's own turn count where it reports one.
 An engine that fails **after** committing reports `ok:false` with its commits
 (exit 1); one that fails before producing anything is still exit 2.
 
+**Redirected engine config (PHEOBE-47).** When a caller relocates an engine's config/auth dir via env
+(agent-launch's per-agent home does), `moderate` mounts it **writable** so the engine still finds its
+login: claude/claude-sdk `CLAUDE_CONFIG_DIR`, opencode `OPENCODE_CONFIG_DIR`, kimi (cece) `CECE_HOME` then
+`KIMI_SHARE_DIR`; agy reads none; codex/cursor use their native sandbox. Only existing absolute dirs are
+bound (never `/`, `$HOME` or an ancestor); a symlink inside one (e.g. `.credentials.json` → `~/.claude/…`)
+keeps resolving — its target is mounted read-only unless an existing mount covers it. Each bind is logged
+to stderr (`pheobe: <engine> moderate sandbox: binding $VAR=…`).
+
 ### The `claude-sdk` worker (PHEOBE-45)
 
 `PHEOBE_PROVIDER=claude-sdk` drives the same claude CLI the way the Claude

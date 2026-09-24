@@ -376,3 +376,47 @@ fn live_claude_sdk_denies_out_of_scope_write() {
     );
     assert!(o.usd.is_some_and(|u| u > 0.0));
 }
+
+/// PHEOBE-47 live (gated): claude-sdk under the MODERATE sandbox with CLAUDE_CONFIG_DIR
+/// redirected outside ~/.claude — the exact s463 failure ("Not logged in"). Set
+/// PHEOBE_LIVE_CLAUDE=1 and PHEOBE_LIVE_CLAUDE_CONFIG_DIR=<a logged-in config dir>.
+#[test]
+fn live_claude_sdk_moderate_with_redirected_config_dir() {
+    if std::env::var("PHEOBE_LIVE_CLAUDE").as_deref() != Ok("1") {
+        return;
+    }
+    let Ok(cfg) = std::env::var("PHEOBE_LIVE_CLAUDE_CONFIG_DIR") else {
+        eprintln!("skip: set PHEOBE_LIVE_CLAUDE_CONFIG_DIR");
+        return;
+    };
+    std::env::set_var("CLAUDE_CONFIG_DIR", &cfg);
+    let dir = std::env::temp_dir().join(format!("pheobe-live-47-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let ctx = WorkerCtx {
+        model: Some("haiku".into()),
+        sandbox: Some(crate::sandbox::Tier::Moderate),
+        paths_allow: vec!["hi.txt".into()],
+        max_usd: Some(0.10),
+        ..Default::default()
+    };
+    let o = ClaudeSdkWorker
+        .run_with(
+            "Create a file hi.txt in this directory containing the word hi. Reply in one line.",
+            &dir,
+            &ctx,
+        )
+        .expect("live run");
+    std::env::remove_var("CLAUDE_CONFIG_DIR");
+    eprintln!(
+        "live47: usd={:?} turns={:?} tail={:?}",
+        o.usd, o.turns, o.json_tail
+    );
+    assert!(
+        !format!("{:?}", o.json_tail).contains("Not logged in"),
+        "still not logged in"
+    );
+    assert!(dir.join("hi.txt").exists(), "engine did not write hi.txt");
+    assert!(o.usd.is_some_and(|u| u > 0.0));
+    std::fs::remove_dir_all(&dir).ok();
+}
