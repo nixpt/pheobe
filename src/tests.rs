@@ -13,6 +13,7 @@ mod claude_sdk;
 mod contract;
 mod cursor;
 mod e2e;
+mod exclude;
 mod gates;
 mod host;
 mod knowledge;
