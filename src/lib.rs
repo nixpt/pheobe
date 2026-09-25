@@ -20,6 +20,7 @@ pub mod plan;
 pub mod report;
 pub mod run;
 pub mod sandbox;
+pub mod siblings;
 pub mod structint;
 pub mod task;
 pub mod testparse;
