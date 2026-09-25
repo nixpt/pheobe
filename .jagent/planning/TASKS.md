@@ -98,6 +98,7 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 - [x] **PHEOBE-45** (`tickets/PHEOBE-45-claude-sdk-worker.md`) — `claude-sdk` worker: the Agent SDK's stream-json control protocol from Rust; per-tool policy (writes, screened bash incl. shell writes, read hook), real cost/turns, interrupt at TTL, `--setting-sources=` isolation. _(foreman s463, option A)_
 - [x] **PHEOBE-47** (`tickets/PHEOBE-47-sandbox-redirected-config.md`) — moderate sandbox mounts env-redirected engine config dirs (CLAUDE_CONFIG_DIR, OPENCODE_CONFIG_DIR, CECE_HOME/KIMI_SHARE_DIR); fixes "Not logged in" under agent-launch. _(foreman s463)_
 - [x] **PHEOBE-46** (`tickets/PHEOBE-46-engine-parity.md`) — engine parity: every worker honours model/ttl/sandbox (shared engine.rs), task `provider`, truthful usd/turns, error-after-commit = exit 1, kimi tail filter, codex timeout; fixes timed-out engines never being killed. _(foreman s463)_
+- [x] **PHEOBE-51** (`tickets/PHEOBE-51-in-repo-worktrees.md`) — fleet repos (`.jagent/`) get worktrees inside at `.jagent/worktrees/<branch>` with sibling links (buckets `--path`, git fallback); others keep the sibling layout
 - [x] **PHEOBE-44** (`tickets/PHEOBE-44-done-when-docs-vs-code.md`) — `done_when`: implement `files_exist`, drop `git_diff_matches` from docs. _(foreman s463, for FMN-4 tiered dispatch)_
 - coverage (cargo-llvm-cov, 2026-09-16, PHEOBE-34): 83.16% lines / 81.05% regions / 79.21% functions (`main.rs` 80.91%; was 79.31% / `main.rs` 0%)
 - [x] PHEOBE-31 — `pheobe doctor` prints compiled version vs crates.io / github tags

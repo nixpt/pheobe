@@ -20,6 +20,7 @@ mod opencode;
 mod outcome;
 mod p10;
 mod parity;
+mod placement;
 mod redirect;
 mod runner;
 mod scripted;
