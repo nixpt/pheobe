@@ -10,6 +10,7 @@ mod aging;
 mod agy;
 mod claude;
 mod claude_sdk;
+mod cline;
 mod contract;
 mod cursor;
 mod e2e;
