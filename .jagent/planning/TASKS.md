@@ -100,6 +100,7 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 - [x] **PHEOBE-46** (`tickets/PHEOBE-46-engine-parity.md`) — engine parity: every worker honours model/ttl/sandbox (shared engine.rs), task `provider`, truthful usd/turns, error-after-commit = exit 1, kimi tail filter, codex timeout; fixes timed-out engines never being killed. _(foreman s463)_
 - [x] **PHEOBE-51** (`tickets/PHEOBE-51-in-repo-worktrees.md`) — fleet repos (`.jagent/`) get worktrees inside at `.jagent/worktrees/<branch>` with sibling links (buckets `--path`, git fallback); others keep the sibling layout
 - [x] **PHEOBE-49** (`tickets/PHEOBE-49-cline-worker-adapter.md`) — cline worker adapter: `PHEOBE_PROVIDER=cline`, cline 3.x headless `--json`, final `run_result` parsed (prose, usage/cost, turns, `finishReason=error` surfaced)
+- [x] **PHEOBE-50** (`tickets/PHEOBE-50-codex-workspace-write-git-store.md`) — codex workspace-write sandbox gets `--add-dir` for the shared git dir + `$CARGO_TARGET_DIR`, so the engine can commit in a linked worktree
 - [x] **PHEOBE-44** (`tickets/PHEOBE-44-done-when-docs-vs-code.md`) — `done_when`: implement `files_exist`, drop `git_diff_matches` from docs. _(foreman s463, for FMN-4 tiered dispatch)_
 - coverage (cargo-llvm-cov, 2026-09-16, PHEOBE-34): 83.16% lines / 81.05% regions / 79.21% functions (`main.rs` 80.91%; was 79.31% / `main.rs` 0%)
 - [x] PHEOBE-31 — `pheobe doctor` prints compiled version vs crates.io / github tags
