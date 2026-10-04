@@ -109,6 +109,7 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 - [x] PHEOBE-36 — `.jagent/` refreshed: PROJECT.md (public repo, crate, channel), STATE.md (M2 done, coverage, open items), ROADMAP (M0–M2 ✅, M3 current)
 - [x] **PHEOBE-37** (`tickets/PHEOBE-37-fix-search-walk-target-files.md`) — fix `search::walk` skipping files starting with "target" (issue 11). Done (agy).
 - [x] **PHEOBE-38** (`tickets/PHEOBE-38-etxtbsy-shim-write.md`) — issue 10: `write_shim` tmp+rename + worker spawn retry on ETXTBSY.
+- [x] **PHEOBE-40** (`tickets/PHEOBE-40-local-models-recipe.md`) — local-models recipe: `scripts/pheobe-local` (registry-driven llama-server/vLLM launcher, `smoke` probe for tools-rendering + structured calls, `run`) + `docs/LOCAL_MODELS.md` (flags, why, measured model notes). Verified on both engines (vega, s500).
 - [x] **PHEOBE-39** (`tickets/PHEOBE-39-toolcall-type.md`) — `tool_calls[].type = "function"` (issue 12); first self-mode run on a strict llama.cpp server (Kaggle GPU).
 - [x] **PHEOBE-41** (`tickets/PHEOBE-41-claude-model-knob.md`) — claude worker model knob. _(foreman s463, for FMN-4 tiered dispatch)_
 - [x] **PHEOBE-42** (`tickets/PHEOBE-42-run-exit-codes.md`) — `run` exit codes + JSON on every path (BREAKING). _(foreman s463, for FMN-4 tiered dispatch)_
