@@ -160,6 +160,14 @@ fn run_after_provision(
     // everything on the branch since provision — the engine's own commits
     // (worker route) and the gate's (issue 05)
     let commits = worktree::commits_since(wt, &base_sha)?;
+    // PHEOBE-48: .pheobe/ is excluded at provision, but `git add -f` gets past that.
+    // Name it rather than fail the run.
+    let mut doubts = outcome.doubts;
+    for hit in worktree::commits_touching_pheobe(wt, &base_sha).unwrap_or_default() {
+        doubts.push(format!(
+            "pheobe sidecar state was committed on the branch ({hit}) — drop it before merge"
+        ));
+    }
 
     // PHEOBE-46: an engine that failed after it was started. Nothing on the
     // branch → it never produced anything: keep the pre-46 error path (exit 2,
@@ -197,7 +205,7 @@ fn run_after_provision(
         tests,
         summary: outcome.summary,
         next_steps: outcome.next_steps,
-        doubts: outcome.doubts,
+        doubts,
         blocked: if ok {
             None
         } else {

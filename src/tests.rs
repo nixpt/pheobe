@@ -14,6 +14,7 @@ mod cline;
 mod contract;
 mod cursor;
 mod e2e;
+mod exclude;
 mod gates;
 mod host;
 mod knowledge;
