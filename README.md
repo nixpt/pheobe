@@ -173,6 +173,14 @@ real transcript) is the conformance test; re-run the suite, and the live test
 (`PHEOBE_LIVE_CLAUDE=1 cargo test live_claude_sdk -- --ignored`), when the claude
 CLI version moves. The subprocess `claude` worker stays as the fallback.
 
+## Local models
+
+`scripts/pheobe-local` serves a model from your own registry
+(`~/.pheobe/models.d/NAME.env`) on llama-server or vLLM with the flags that
+make tool calling actually work, proves it (`smoke`: does the server render
+`tools`, does it return structured `tool_calls`), and hands `pheobe run` the
+env. `docs/LOCAL_MODELS.md` has the why, measured model notes, and sizing.
+
 ## Adoption kits
 
 `adopt/` holds one kit per harness, each a thin wrapper over the same JSON

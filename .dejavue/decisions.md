@@ -87,3 +87,17 @@ Rejected alternatives:
 - **spawn through sh <path>**: changes argv[0] and would hide missing +x
 - **serialize all adapter tests**: slower than the race is rare
 
+
+## 2026-09-17T03:22:28-05:00 — [STRATEGIC] [ADOPTED] [ARCHITECTURAL] Local-model serving is a launcher + registry outside the crate, not a pheobe config file
+
+Reason:
+pheobe stays environment-driven (PHEOBE_BASE_URL/PHEOBE_MODEL); the engine flags that make tool calling work (--jinja, one slot, family tool parser, MTP draft, 12 GB memory settings) belong in scripts/pheobe-local, and box-specific paths in ~/.pheobe/models.d. A config file in the crate would have to know paths it cannot know and would couple releases to model layouts.
+
+Artifacts: scripts/pheobe-local, docs/LOCAL_MODELS.md
+
+Author type: agent
+
+Rejected alternatives:
+- **a [models] section in a pheobe config file**
+- **hard-coding engine flags in the adopt kits**
+

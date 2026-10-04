@@ -3,8 +3,9 @@
 //! Industry precedent: Vercel's `@ai-sdk/harness` + harness adapters — a
 //! `HarnessAgent` connected to each coding agent. pheobe's `Worker` is the
 //! same idea at the contract level: the engine (opencode, claude, cursor,
-//! codex, kimi — PHEOBE-4..8) does its own internal loop and returns prose;
-//! pheobe's mechanical gates (allowlist, commit, done_when) own the result.
+//! codex, kimi — PHEOBE-4..8; agy, cline — PHEOBE-25/49) does its own internal
+//! loop and returns prose; pheobe's mechanical gates (allowlist, commit,
+//! done_when) own the result.
 //!
 //! The adapter parses whatever engine-tail JSON it can out of the engine's
 //! final output into `json_tail`; report normalization (which keys merge into
@@ -118,6 +119,7 @@ const REGISTRY: &[(&str, WorkerFactory)] = &[
     ("cursor", crate::worker_cursor::worker as WorkerFactory),     // PHEOBE-6
     ("kimi", crate::worker_kimi::worker as WorkerFactory),         // PHEOBE-8
     ("agy", crate::worker_agy::worker as WorkerFactory),           // PHEOBE-25
+    ("cline", crate::worker_cline::worker as WorkerFactory),       // PHEOBE-49
     ("antigravity", crate::worker_agy::worker as WorkerFactory),   // PHEOBE-25 alias
 ];
 

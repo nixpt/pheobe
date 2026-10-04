@@ -55,6 +55,23 @@ impl CodexWorker {
     }
 }
 
+/// Extra writable roots for codex's `workspace-write` sandbox (PHEOBE-50):
+/// the repo's shared git dir (engine commits) and `$CARGO_TARGET_DIR`, minus
+/// anything already inside the worktree. Order is stable, duplicates dropped.
+pub(crate) fn add_dirs(m: &crate::engine::Mounts, worktree: &Path) -> Vec<std::path::PathBuf> {
+    let mut out: Vec<std::path::PathBuf> = Vec::new();
+    for d in [&m.git_common, &m.git_dir, &m.cargo_target]
+        .into_iter()
+        .flatten()
+    {
+        let inside = d.starts_with(worktree) || out.iter().any(|o| d.starts_with(o));
+        if !inside {
+            out.push(d.clone());
+        }
+    }
+    out
+}
+
 /// `PHEOBE_SANDBOX` tier → codex `--sandbox` mode (the preset ladder).
 fn sandbox_flag(tier: &str) -> Result<&'static str> {
     match tier {
@@ -131,6 +148,15 @@ impl Worker for CodexWorker {
             "--sandbox",
             sandbox,
         ]);
+        // PHEOBE-50: workspace-write confines writes to the worktree, but the
+        // engine commits — a linked worktree's index.lock lives in the repo's
+        // shared git dir — and cargo builds into $CARGO_TARGET_DIR. Grant the
+        // same extra roots the moderate bwrap tier grants other engines.
+        if sandbox == "workspace-write" {
+            for dir in add_dirs(&crate::engine::Mounts::for_worktree(worktree), worktree) {
+                cmd.arg("--add-dir").arg(dir);
+            }
+        }
         if let Some(m) = &model {
             cmd.args(["-m", m.as_str()]);
         }
@@ -306,6 +332,73 @@ EOF
         );
         let script = fake_codex(dir, "codex", &body);
         (script, capture)
+    }
+
+    #[test]
+    fn add_dirs_grants_the_git_store_and_target_dir_once() {
+        use std::path::PathBuf;
+        let wt = PathBuf::from("/repo-wt");
+        let m = crate::engine::Mounts {
+            home: None,
+            git_dir: Some("/repo/.git/worktrees/x".into()),
+            git_common: Some("/repo/.git".into()),
+            repo_parent: None,
+            cargo_target: Some("/build/t".into()),
+            config_rw: Vec::new(),
+            config_ro: Vec::new(),
+        };
+        assert_eq!(
+            add_dirs(&m, &wt),
+            [PathBuf::from("/repo/.git"), PathBuf::from("/build/t")],
+            "git_dir is inside git_common, so it is not repeated"
+        );
+        let inside = crate::engine::Mounts {
+            cargo_target: Some("/repo-wt/target".into()),
+            ..m
+        };
+        assert_eq!(add_dirs(&inside, &wt), [PathBuf::from("/repo/.git")]);
+    }
+
+    /// PHEOBE-50: the live failure — in a linked worktree codex's
+    /// workspace-write sandbox could not take the shared `index.lock`.
+    #[test]
+    fn codex_linked_worktree_gets_its_git_common_dir_writable() {
+        let dir = scratch("linked");
+        let repo = dir.join("repo");
+        let wt = dir.join("wt");
+        let git = |args: &[&str], cwd: &Path| {
+            let ok = std::process::Command::new("git")
+                .args(args)
+                .current_dir(cwd)
+                .env("GIT_AUTHOR_NAME", "t")
+                .env("GIT_AUTHOR_EMAIL", "t@t")
+                .env("GIT_COMMITTER_NAME", "t")
+                .env("GIT_COMMITTER_EMAIL", "t@t")
+                .status()
+                .unwrap()
+                .success();
+            assert!(ok, "git {args:?}");
+        };
+        std::fs::create_dir_all(&repo).unwrap();
+        git(&["init", "-q"], &repo);
+        std::fs::write(repo.join("a"), "a").unwrap();
+        git(&["add", "."], &repo);
+        git(&["commit", "-qm", "init"], &repo);
+        git(&["worktree", "add", "-q", wt.to_str().unwrap()], &repo);
+        let (script, capture) = capture_codex(&dir, "ok");
+        let worker = CodexWorker {
+            bin: script.to_string_lossy().into(),
+            tier: "moderate".into(),
+        };
+        worker.run("p", &wt).unwrap();
+        let captured = std::fs::read_to_string(&capture).unwrap();
+        let lines: Vec<&str> = captured.lines().collect();
+        let common = std::fs::canonicalize(repo.join(".git")).unwrap();
+        assert!(
+            lines.windows(2).any(|w| w[0] == "--add-dir"
+                && std::fs::canonicalize(w[1]).ok().as_ref() == Some(&common)),
+            "the shared git dir must be writable: {captured}"
+        );
     }
 
     #[test]
