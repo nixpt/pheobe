@@ -1,5 +1,8 @@
 //! Worktree isolation — pheobe never cooks in the parent's checkout.
-//! Ladder: kitchen (when present) > buckets worktree > plain git worktree add.
+//! Ladder: buckets worktree (when on PATH) > plain git worktree add. In a
+//! fleet repo (has `.jagent/`, squadron SQ-204) the worktree goes INSIDE the
+//! repo at `.jagent/worktrees/<branch>` with sibling links (PHEOBE-51,
+//! `siblings`); elsewhere it stays a sibling of the repo.
 //! Warn when the given repo looks like a primary source checkout and
 //! worktree was declined.
 
@@ -68,20 +71,48 @@ pub fn next_free_branch(repo: &Path, base: &str) -> Result<String> {
 
 /// Provision an isolated working copy. Returns (worktree path, branch).
 pub fn provision(repo: &Path, branch: &str) -> Result<(PathBuf, String)> {
+    let buckets = buckets_available().then_some("buckets");
+    provision_with(repo, branch, buckets)
+}
+
+/// `provision` with the buckets binary injected (`None` = plain git only).
+pub(crate) fn provision_with(
+    repo: &Path,
+    branch: &str,
+    buckets: Option<&str>,
+) -> Result<(PathBuf, String)> {
     if !is_source_checkout(repo) {
         // already a worktree — find the source repo and branch from it
         bail!("given repo is already a worktree; pass the source repo (kitchen resolves this)")
     }
     let branch = next_free_branch(repo, branch)?;
-    if buckets_available() {
-        return provision_buckets(repo, &branch);
+    // PHEOBE-51: a fleet repo keeps the worktree inside itself, so an engine
+    // pointed at the repo never needs out-of-path permissions.
+    let in_repo = crate::siblings::in_repo_dest(repo, &branch);
+    if in_repo.is_some() {
+        crate::siblings::link(repo);
+    }
+    if let Some(bin) = buckets {
+        match provision_buckets(bin, repo, &branch, in_repo.as_deref()) {
+            Ok(done) => return Ok(done),
+            // a buckets older than BUCKETS-17 has no --path: fall through to
+            // plain git so the placement rule still holds
+            Err(e) if in_repo.is_some() && format!("{e:#}").contains("--path") => {
+                eprintln!(
+                    "pheobe: buckets has no --path (pre BUCKETS-17) — using git worktree add"
+                );
+            }
+            Err(e) => return Err(e),
+        }
     }
     // plain git fallback
-    let wt = repo.join(format!(
-        "../{}-{}",
-        repo.file_name().and_then(|n| n.to_str()).unwrap_or("repo"),
-        branch.replace('/', "-")
-    ));
+    let wt = in_repo.unwrap_or_else(|| {
+        repo.join(format!(
+            "../{}-{}",
+            repo.file_name().and_then(|n| n.to_str()).unwrap_or("repo"),
+            branch.replace('/', "-")
+        ))
+    });
     run(Command::new("git").arg("-C").arg(repo).args([
         "worktree",
         "add",
@@ -102,13 +133,18 @@ fn which(bin: &str) -> bool {
         .is_ok_and(|s| s.success())
 }
 
-fn provision_buckets(repo: &Path, branch: &str) -> Result<(PathBuf, String)> {
-    let wt = run(Command::new("buckets").args([
-        "worktree",
-        "create",
-        &repo.display().to_string(),
-        branch,
-    ]))?;
+fn provision_buckets(
+    bin: &str,
+    repo: &Path,
+    branch: &str,
+    path: Option<&Path>,
+) -> Result<(PathBuf, String)> {
+    let mut cmd = Command::new(bin);
+    cmd.args(["worktree", "create", &repo.display().to_string(), branch]);
+    if let Some(p) = path {
+        cmd.arg("--path").arg(p);
+    }
+    let wt = run(&mut cmd)?;
     let last = wt
         .lines()
         .last()

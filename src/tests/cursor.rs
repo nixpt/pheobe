@@ -276,3 +276,29 @@ fn cursor_unknown_sandbox_tier_errors_at_run() {
     );
     std::fs::remove_dir_all(&dir).ok();
 }
+
+/// PHEOBE-46: task `model` → `--model`, and the run's tier (task `sandbox`,
+/// here free) reaches cursor's native `--sandbox` without PHEOBE_SANDBOX.
+#[test]
+fn cursor_run_with_task_model_and_task_tier() {
+    let _env = CursorEnv::lock();
+    let dir = scratch("run-with");
+    let (script, capture) = capture_cursor(&dir, "ok");
+    set_env("PHEOBE_CURSOR_BIN", &script.to_string_lossy());
+    let ctx = crate::worker::WorkerCtx {
+        model: Some("sonnet-4".into()),
+        sandbox: Some(crate::sandbox::Tier::Free),
+        ..Default::default()
+    };
+    CursorWorker.run_with("do it", &dir, &ctx).unwrap();
+    let captured = std::fs::read_to_string(&capture).unwrap();
+    let lines: Vec<&str> = captured.lines().collect();
+    assert!(
+        lines.windows(2).any(|w| w == ["--sandbox", "disabled"]),
+        "{captured}"
+    );
+    assert!(
+        lines.windows(2).any(|w| w == ["--model", "sonnet-4"]),
+        "{captured}"
+    );
+}

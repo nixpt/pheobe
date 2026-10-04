@@ -9,6 +9,15 @@ use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+const DEFAULT_TIMEOUT_SECS: u64 = 120;
+
+fn endpoint_timeout_secs() -> u64 {
+    std::env::var("PHEOBE_TIMEOUT_SECS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(DEFAULT_TIMEOUT_SECS)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Msg {
     /// system | user | assistant | tool
@@ -115,6 +124,10 @@ pub struct Usage {
     pub turns: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub total_tokens: Option<u64>,
+    /// Cost the engine reported (worker route; PHEOBE-46). None = the engine
+    /// doesn't report cost — never estimated here.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub usd: Option<f64>,
 }
 
 /// The LLM behind the loop is pluggable; the loop is the contract.
@@ -156,7 +169,7 @@ impl Provider for OpenAi {
         }
         let url = format!("{}/chat/completions", self.base_url);
         let client = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(120))
+            .timeout(std::time::Duration::from_secs(endpoint_timeout_secs()))
             .build()
             .context("http client")?;
         let mut req = client
@@ -188,5 +201,22 @@ pub fn truncate(s: &str, max: usize) -> String {
         s.to_string()
     } else {
         format!("{}…[{} bytes truncated]", &s[..max], s.len() - max)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::memory::tests::env_lock;
+
+    #[test]
+    fn timeout_secs_honors_override_and_default() {
+        let _guard = env_lock();
+        std::env::set_var("PHEOBE_TIMEOUT_SECS", "999");
+        assert_eq!(endpoint_timeout_secs(), 999);
+        std::env::set_var("PHEOBE_TIMEOUT_SECS", "not-a-number");
+        assert_eq!(endpoint_timeout_secs(), DEFAULT_TIMEOUT_SECS);
+        std::env::remove_var("PHEOBE_TIMEOUT_SECS");
+        assert_eq!(endpoint_timeout_secs(), DEFAULT_TIMEOUT_SECS);
     }
 }

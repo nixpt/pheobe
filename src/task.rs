@@ -34,6 +34,19 @@ pub struct Task {
     /// explicit task value — env is the operator override).
     #[serde(default)]
     pub sandbox: Option<String>,
+    /// Engine model for worker adapters (PHEOBE-41 claude; PHEOBE-46 every
+    /// engine: opencode/codex/kimi `-m`, cursor/agy `--model`). The adapter's
+    /// own env override (`PHEOBE_<ENGINE>_MODEL`) wins over this, as
+    /// `PHEOBE_SANDBOX` wins over `sandbox`. Ignored by the built-in loop
+    /// (that uses `PHEOBE_MODEL`).
+    #[serde(default)]
+    pub model: Option<String>,
+    /// Engine for this task (PHEOBE-46): `openai` (the built-in loop) or a
+    /// registered worker (`opencode`, `claude`, `claude-sdk`, `codex`,
+    /// `cursor`, `kimi`, `agy`). `PHEOBE_PROVIDER` wins over it — the operator
+    /// override, the same rule as `sandbox`/`model`.
+    #[serde(default)]
+    pub provider: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,6 +58,8 @@ pub enum DoneWhen {
         #[serde(default = "default_expect_exit")]
         expect_exit: i32,
     },
+    /// Every listed path (relative to the worktree) exists (PHEOBE-44).
+    FilesExist { paths: Vec<String> },
 }
 
 fn default_true() -> bool {
@@ -119,9 +134,16 @@ impl Task {
         if self.task.trim().is_empty() {
             bail!("task is empty");
         }
-        let DoneWhen::Command { run, .. } = &self.done_when;
-        if run.trim().is_empty() {
-            bail!("done_when.run is empty — a run without a mechanical gate is not a pheobe task");
+        match &self.done_when {
+            DoneWhen::Command { run, .. } if run.trim().is_empty() => {
+                bail!(
+                    "done_when.run is empty — a run without a mechanical gate is not a pheobe task"
+                )
+            }
+            DoneWhen::FilesExist { paths } if paths.iter().all(|p| p.trim().is_empty()) => {
+                bail!("done_when.paths is empty — files_exist needs at least one path")
+            }
+            _ => {}
         }
         // Fuzziness gate (mayfly's rule, intentionally strict). Heuristics, not law —
         // but a vague ask dies here rather than burning budget.
@@ -140,7 +162,25 @@ impl Task {
         if t.contains(" and also ") {
             bail!("multiple top-level goals — one purpose per run");
         }
+        if let Some(p) = &self.provider {
+            if !crate::worker::is_known_provider(p) {
+                bail!(
+                    "unknown provider '{p}' — one of: openai, {}",
+                    crate::worker::provider_names().join(", ")
+                );
+            }
+        }
         Ok(())
+    }
+
+    /// The engine this task runs on: `PHEOBE_PROVIDER` > task `provider` >
+    /// `openai` (PHEOBE-46).
+    pub fn effective_provider(&self) -> String {
+        std::env::var("PHEOBE_PROVIDER")
+            .ok()
+            .filter(|p| !p.trim().is_empty())
+            .or_else(|| self.provider.clone())
+            .unwrap_or_else(|| "openai".to_string())
     }
 
     pub fn resolve_repo(&self) -> Result<PathBuf> {

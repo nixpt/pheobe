@@ -8,6 +8,7 @@
 //! `structural` (the polydex ladder).
 
 mod exec;
+pub(crate) use exec::destructive_guard;
 mod fs;
 mod meta;
 pub(crate) mod search;

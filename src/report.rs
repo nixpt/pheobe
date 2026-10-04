@@ -69,6 +69,31 @@ impl HandoffReport {
 }
 
 /// Emit the report on stdout as the run's last act.
+/// Exit codes for `pheobe run` (PHEOBE-42). The JSON report is ALWAYS on
+/// stdout; the code only tells a dispatcher which case it's in without
+/// parsing:
+/// - `0` — ran, `ok: true`
+/// - `1` — ran, `ok: false` (done_when failed, blocked, budget/ttl, allowlist)
+/// - `2` — never ran: intake or provisioning error (report carries it in `blocked`)
+pub const EXIT_OK: i32 = 0;
+pub const EXIT_NOT_OK: i32 = 1;
+pub const EXIT_ERROR: i32 = 2;
+
+/// Map a run result to (report, exit code). An error still produces a
+/// report, so stdout is always one JSON object.
+pub fn cli_outcome(task: &str, res: anyhow::Result<HandoffReport>) -> (HandoffReport, i32) {
+    match res {
+        Ok(rep) => {
+            let code = if rep.ok { EXIT_OK } else { EXIT_NOT_OK };
+            (rep, code)
+        }
+        Err(e) => (
+            HandoffReport::failure(task, &format!("error: {e:#}")),
+            EXIT_ERROR,
+        ),
+    }
+}
+
 pub fn emit(report: &HandoffReport) -> anyhow::Result<()> {
     println!("{}", serde_json::to_string_pretty(report)?);
     Ok(())

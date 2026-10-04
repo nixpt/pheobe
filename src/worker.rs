@@ -3,8 +3,9 @@
 //! Industry precedent: Vercel's `@ai-sdk/harness` + harness adapters — a
 //! `HarnessAgent` connected to each coding agent. pheobe's `Worker` is the
 //! same idea at the contract level: the engine (opencode, claude, cursor,
-//! codex, kimi — PHEOBE-4..8) does its own internal loop and returns prose;
-//! pheobe's mechanical gates (allowlist, commit, done_when) own the result.
+//! codex, kimi — PHEOBE-4..8; agy, cline — PHEOBE-25/49) does its own internal
+//! loop and returns prose; pheobe's mechanical gates (allowlist, commit,
+//! done_when) own the result.
 //!
 //! The adapter parses whatever engine-tail JSON it can out of the engine's
 //! final output into `json_tail`; report normalization (which keys merge into
@@ -13,7 +14,7 @@
 use anyhow::{bail, Result};
 use serde_json::Value;
 use std::path::Path;
-use std::process::{Child, Command, Output};
+use std::process::{Child, Command};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -29,6 +30,9 @@ pub struct WorkerOutcome {
     /// Handoff-shaped JSON the adapter extracted from the engine's tail
     /// (e.g. a final `{"ok":..,"summary":..}` block), if any.
     pub json_tail: Option<Value>,
+    /// Engine turns, when the engine reports them (claude-sdk: `num_turns`).
+    /// `None` = one opaque worker call (the report then counts 1).
+    pub turns: Option<u32>,
 }
 
 /// The engine's final message may itself be the handoff contract: bare
@@ -72,10 +76,32 @@ pub fn extract_json_tail(final_text: &str) -> Option<Value> {
     None
 }
 
+/// Per-run knobs a worker MAY honour (PHEOBE-41/43). Adapters that ignore
+/// them keep working unchanged: `run_with` defaults to `run`.
+#[derive(Debug, Clone, Default)]
+pub struct WorkerCtx {
+    /// Engine model id (task `model`, or the adapter's own env override).
+    pub model: Option<String>,
+    /// The task's ttl: an adapter's subprocess timeout should not outlive it.
+    pub ttl: Option<std::time::Duration>,
+    /// The resolved sandbox tier (`PHEOBE_SANDBOX` → task → moderate).
+    pub sandbox: Option<crate::sandbox::Tier>,
+    /// The task's `paths_allow` — adapters that can see individual tool calls
+    /// (claude-sdk) enforce it per call, not only at the post-run gate.
+    pub paths_allow: Vec<String>,
+    /// The task's `budget.max_usd`, for adapters that can cap cost themselves.
+    pub max_usd: Option<f64>,
+}
+
 /// One prompt out, one whole run back. The engine owns its internal loop;
 /// pheobe owns everything mechanical around it (aging ladder, budget, gates).
 pub trait Worker {
     fn run(&self, prompt: &str, worktree: &Path) -> Result<WorkerOutcome>;
+
+    /// `run` with per-run knobs. Default: ignore them (adapters opt in).
+    fn run_with(&self, prompt: &str, worktree: &Path, _ctx: &WorkerCtx) -> Result<WorkerOutcome> {
+        self.run(prompt, worktree)
+    }
 }
 
 /// Registry: `PHEOBE_PROVIDER` name → worker constructor. Adapters
@@ -85,14 +111,30 @@ type WorkerFactory = fn() -> Result<Arc<dyn Worker>>;
 const REGISTRY: &[(&str, WorkerFactory)] = &[
     ("opencode", crate::worker_opencode::worker as WorkerFactory), // PHEOBE-4
     ("claude", crate::worker_claude::worker as WorkerFactory),     // PHEOBE-5
+    (
+        "claude-sdk",
+        crate::worker_claude_sdk::worker as WorkerFactory,
+    ), // PHEOBE-45
     ("codex", crate::worker_codex::worker as WorkerFactory),       // PHEOBE-7
     ("cursor", crate::worker_cursor::worker as WorkerFactory),     // PHEOBE-6
     ("kimi", crate::worker_kimi::worker as WorkerFactory),         // PHEOBE-8
     ("agy", crate::worker_agy::worker as WorkerFactory),           // PHEOBE-25
+    ("cline", crate::worker_cline::worker as WorkerFactory),       // PHEOBE-49
     ("antigravity", crate::worker_agy::worker as WorkerFactory),   // PHEOBE-25 alias
 ];
 
 /// Resolve a `PHEOBE_PROVIDER` name. `Ok(None)` = the built-in per-turn
+/// Registered worker names (PHEOBE-46: task `provider` validation).
+pub fn provider_names() -> Vec<&'static str> {
+    REGISTRY.iter().map(|(n, _)| *n).collect()
+}
+
+/// `openai` (the built-in loop) or a registered worker name.
+pub fn is_known_provider(name: &str) -> bool {
+    let n = name.trim();
+    n == "openai" || REGISTRY.iter().any(|(r, _)| *r == n)
+}
+
 /// `Provider` loop (openai, the default). `Ok(Some(_))` = a registered
 /// worker adapter. Unknown name = a clear error naming the culprit.
 pub fn worker_from_env(provider: &str) -> Result<Option<Arc<dyn Worker>>> {
@@ -132,21 +174,6 @@ pub(crate) fn spawn_retry(cmd: &mut Command) -> std::io::Result<Child> {
         }
     }
     cmd.spawn()
-}
-
-/// `Command::output` with the same ETXTBSY backoff as [`spawn_retry`].
-pub(crate) fn output_retry(cmd: &mut Command) -> std::io::Result<Output> {
-    let mut wait = Duration::from_millis(2);
-    for attempt in 0..8 {
-        match cmd.output() {
-            Err(e) if is_etxtbsy(&e) && attempt + 1 < 8 => {
-                std::thread::sleep(wait);
-                wait = wait.saturating_mul(2);
-            }
-            other => return other,
-        }
-    }
-    cmd.output()
 }
 
 #[cfg(test)]

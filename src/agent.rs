@@ -22,6 +22,11 @@ pub struct RunOutcome {
     pub blocked: Option<String>,
     pub usage: Usage,
     pub history: Vec<Msg>,
+    /// The worker engine itself failed (non-zero exit, timeout kill, spawn
+    /// error) AFTER being started (PHEOBE-46). run.rs decides the exit class:
+    /// with commits on the branch it is a failed run (ok:false, exit 1); with
+    /// none it stays "never ran" (exit 2).
+    pub engine_error: Option<String>,
 }
 
 pub struct LoopCfg {
@@ -196,6 +201,8 @@ pub fn build_prompt_for(
         match &task.done_when {
             crate::task::DoneWhen::Command { run, expect_exit } =>
                 format!("{run} [expect exit {expect_exit}]"),
+            crate::task::DoneWhen::FilesExist { paths } =>
+                format!("files exist: {}", paths.join(", ")),
         },
         task.paths_allow
     ));
@@ -301,7 +308,17 @@ pub fn run_worker(
         }
     }
 
-    let res = worker.run(&format!("{prompt}\n\nBegin. task_id={task_id}"), wt);
+    let ctx = crate::worker::WorkerCtx {
+        model: task.model.clone(),
+        ttl: cfg.ttl,
+        sandbox: task
+            .effective_sandbox()
+            .ok()
+            .and_then(|t| crate::sandbox::Tier::from_name(&t).ok()),
+        paths_allow: task.paths_allow.clone(),
+        max_usd: task.budget.as_ref().and_then(|b| b.max_usd),
+    };
+    let res = worker.run_with(&format!("{prompt}\n\nBegin. task_id={task_id}"), wt, &ctx);
 
     // deadline check AFTER the worker call — the engine's internal loop has
     // no visibility into pheobe's ladder, so an engine that overruns its ttl
@@ -315,31 +332,55 @@ pub fn run_worker(
         ));
     }
 
-    let wo = res?;
+    let wo = match res {
+        Ok(wo) => wo,
+        Err(e) => {
+            let why = format!("{e:#}");
+            let mut o = outcome_from_handoff(
+                &serde_json::json!({
+                    "ok": false,
+                    "summary": "",
+                    "blocked": format!("engine failed: {why}"),
+                    "doubts": [],
+                    "next_steps": [],
+                }),
+                1,
+                None,
+                vec![Msg::system(prompt.as_str())],
+            );
+            o.engine_error = Some(why);
+            return Ok(o);
+        }
+    };
     // budget guard AFTER: a single worker call that blows the budget is cut
     if let (Some(max_usd), Some(rate)) = (cfg.max_usd, cfg.usd_per_mtok) {
         let tokens = wo.tokens.unwrap_or(0);
         let spent = wo.usd.unwrap_or(tokens as f64 * rate / 1_000_000.0);
         if spent >= max_usd {
-            return Ok(outcome_from_handoff(
+            let mut o = outcome_from_handoff(
                 &budget_block(spent, tokens),
-                1,
+                wo.turns.unwrap_or(1),
                 Some(tokens),
                 vec![Msg::system(prompt.as_str())],
-            ));
+            );
+            o.usage.usd = wo.usd;
+            return Ok(o);
         }
     }
 
     let handoff = normalize_worker_outcome(&wo);
-    Ok(outcome_from_handoff(
+    let mut o = outcome_from_handoff(
         &handoff,
-        1,
+        wo.turns.unwrap_or(1),
         wo.tokens,
         vec![
             Msg::system(prompt.as_str()),
             Msg::assistant(wo.final_text.as_str(), vec![]),
         ],
-    ))
+    );
+    // the engine's own reported cost reaches the report (PHEOBE-46)
+    o.usage.usd = wo.usd;
+    Ok(o)
 }
 
 /// Report normalization (PHEOBE-9): if the engine's json_tail parses, merge
@@ -395,8 +436,10 @@ fn outcome_from_handoff(
         usage: Usage {
             turns,
             total_tokens: tokens,
+            usd: None,
         },
         history,
+        engine_error: None,
     }
 }
 

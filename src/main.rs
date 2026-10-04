@@ -215,9 +215,18 @@ fn cmd_acp() -> Result<()> {
 
 fn cmd_run(task_file: &str, branch: Option<String>) -> Result<()> {
     learn::init(); // PHEOBE_MEMORY=none|local|host selects the store (PHEOBE-16)
-    let task = task::load(task_file)?;
-    let rep = run::run_task(&task, branch.as_deref(), &|stage| eprintln!("{stage}"))?;
-    report::emit(&rep)
+                   // PHEOBE-42: stdout is always one JSON report, and the exit code says
+                   // which case it is (report::EXIT_*) — intake/provision errors included.
+    let loaded = task::load(task_file);
+    let task_text = loaded.as_ref().map(|t| t.task.clone()).unwrap_or_default();
+    let res = loaded
+        .and_then(|task| run::run_task(&task, branch.as_deref(), &|stage| eprintln!("{stage}")));
+    if let Err(e) = &res {
+        eprintln!("pheobe: {e:#}");
+    }
+    let (rep, code) = report::cli_outcome(&task_text, res);
+    report::emit(&rep)?;
+    std::process::exit(code)
 }
 
 fn cmd_verify(task_file: &str, worktree: Option<String>) -> Result<()> {

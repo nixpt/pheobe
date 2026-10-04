@@ -21,6 +21,7 @@ impl Worker for ScriptedWorker {
             tokens: self.outcome.tokens,
             usd: self.outcome.usd,
             json_tail: self.outcome.json_tail.clone(),
+            turns: None,
         })
     }
 }
@@ -45,6 +46,7 @@ fn worker_prose_tail_becomes_summary() {
             tokens: Some(1200),
             usd: None,
             json_tail: None,
+            turns: None,
         },
     };
     let out = run_worker(&w, &task, &dir, "w1", "", &[], &LoopCfg::default()).unwrap();
@@ -91,6 +93,7 @@ fn worker_json_tail_merges_report_contract_only() {
                 "commits": ["deadbeef"],
                 "tests": {"ran": "cargo test", "passed": true}
             })),
+            turns: None,
         },
     };
     let out = run_worker(&w, &task, &dir, "w2", "", &[], &LoopCfg::default()).unwrap();
@@ -112,6 +115,7 @@ fn worker_json_tail_merges_report_contract_only() {
             tokens: None,
             usd: None,
             json_tail: Some(serde_json::json!({"doubts": ["only doubts"]})),
+            turns: None,
         },
     };
     let out2 = run_worker(&w2, &task, &dir, "w2b", "", &[], &LoopCfg::default()).unwrap();
@@ -133,6 +137,7 @@ fn worker_ttl_hard_stop_before_the_call() {
             tokens: Some(1),
             usd: None,
             json_tail: None,
+            turns: None,
         },
     };
     let cfg = LoopCfg {
@@ -166,6 +171,7 @@ fn worker_result_ignored_when_ttl_expires_during_the_call() {
                 tokens: Some(10),
                 usd: None,
                 json_tail: None,
+                turns: None,
             })
         }
     }

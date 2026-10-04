@@ -34,6 +34,24 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
       `target*` (Done, PHEOBE-37, agy)
 - [x] **issue 12** (`../issues/12-toolcall-missing-type-function-rejected-by-llama-cpp.md`) — echoed tool_calls lacked
       `type: function`; llama.cpp rejected turn 2 (Done, PHEOBE-39)
+- [ ] **issue 13** (`../issues/13-no-max-tokens-on-the-wire.md`) — `llm.rs` sends no `max_tokens`; the reply budget
+      is the server's default (unlimited on llama-server, **128** on `zorro serve`) — silent truncation of edit turns
+      on any conservative endpoint (found s500, vega)
+- [ ] **issue 14** (`../issues/14-text-reply-exit-mislabelled-as-max-turns.md`) — a model that answers in prose
+      (no tool call) exits the loop, and the report claims `max_turns (32) reached` at `turns: 3`; `blocked` sends
+      the adopter after budget when the problem is the endpoint (found s500, vega)
+- [ ] **issue 15** (`../issues/15-worker-failure-emits-no-report.md`) — a worker adapter timeout or non-zero exit
+      ends `pheobe run` with **no JSON on stdout** (exit 1, stderr only) and tears the worktree down; the kits
+      all parse stdout (found s500, vega: opencode timeout, kimi startup failure)
+- [ ] **issue 16** (`../issues/16-codex-sandbox-cannot-commit-in-a-worktree.md`) — codex `workspace-write` can't
+      write a linked worktree's gitdir (lives under the parent `.git`) so it can't commit; engine says `ok:false`,
+      and `run_task` then skips pheobe's own commit gate despite a clean allowlist + passing `done_when`. Fix for
+      the sandbox half verified with `writable_roots` (found s500, vega)
+- [ ] **issue 17** (`../issues/17-engine-git-init-clobbers-the-worktree-finalizer-dies.md`) — an engine ran
+      `git init --bare` inside the kitchen; the worktree's `.git` pointer was overwritten, the finalizer died on
+      `commits_since` (exit 128), no report; correct edits stranded — **reproduced unprompted on a 2nd task, P1**. Kitchen identity must be pheobe's — refuse
+      `git init`/`clone`/`worktree` in the sandbox, verify the kitchen before diffing (found s500, vega, first
+      dispatch through the Claude adoption kit)
 - [x] kit drift found s457 (Done, PHEOBE-22): `adopt/claude/self-agent.md` runs `pheobe run <file> --json` (no such
       flag); DESIGN.md's kit table lists `adopt/claude/host/agents/pheobe.md` which does not exist
       (claude has no host kit — the opencode host protocol was used instead); `testparse` labels a
@@ -93,6 +111,16 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 - [x] **PHEOBE-38** (`tickets/PHEOBE-38-etxtbsy-shim-write.md`) — issue 10: `write_shim` tmp+rename + worker spawn retry on ETXTBSY.
 - [x] **PHEOBE-40** (`tickets/PHEOBE-40-local-models-recipe.md`) — local-models recipe: `scripts/pheobe-local` (registry-driven llama-server/vLLM launcher, `smoke` probe for tools-rendering + structured calls, `run`) + `docs/LOCAL_MODELS.md` (flags, why, measured model notes). Verified on both engines (vega, s500).
 - [x] **PHEOBE-39** (`tickets/PHEOBE-39-toolcall-type.md`) — `tool_calls[].type = "function"` (issue 12); first self-mode run on a strict llama.cpp server (Kaggle GPU).
+- [x] **PHEOBE-41** (`tickets/PHEOBE-41-claude-model-knob.md`) — claude worker model knob. _(foreman s463, for FMN-4 tiered dispatch)_
+- [x] **PHEOBE-42** (`tickets/PHEOBE-42-run-exit-codes.md`) — `run` exit codes + JSON on every path (BREAKING). _(foreman s463, for FMN-4 tiered dispatch)_
+- [x] **PHEOBE-43** (`tickets/PHEOBE-43-claude-worker-bounds.md`) — claude worker: ttl-bounded timeout + sandbox. _(foreman s463, for FMN-4 tiered dispatch)_
+- [x] **PHEOBE-45** (`tickets/PHEOBE-45-claude-sdk-worker.md`) — `claude-sdk` worker: the Agent SDK's stream-json control protocol from Rust; per-tool policy (writes, screened bash incl. shell writes, read hook), real cost/turns, interrupt at TTL, `--setting-sources=` isolation. _(foreman s463, option A)_
+- [x] **PHEOBE-47** (`tickets/PHEOBE-47-sandbox-redirected-config.md`) — moderate sandbox mounts env-redirected engine config dirs (CLAUDE_CONFIG_DIR, OPENCODE_CONFIG_DIR, CECE_HOME/KIMI_SHARE_DIR); fixes "Not logged in" under agent-launch. _(foreman s463)_
+- [x] **PHEOBE-46** (`tickets/PHEOBE-46-engine-parity.md`) — engine parity: every worker honours model/ttl/sandbox (shared engine.rs), task `provider`, truthful usd/turns, error-after-commit = exit 1, kimi tail filter, codex timeout; fixes timed-out engines never being killed. _(foreman s463)_
+- [x] **PHEOBE-51** (`tickets/PHEOBE-51-in-repo-worktrees.md`) — fleet repos (`.jagent/`) get worktrees inside at `.jagent/worktrees/<branch>` with sibling links (buckets `--path`, git fallback); others keep the sibling layout
+- [x] **PHEOBE-49** (`tickets/PHEOBE-49-cline-worker-adapter.md`) — cline worker adapter: `PHEOBE_PROVIDER=cline`, cline 3.x headless `--json`, final `run_result` parsed (prose, usage/cost, turns, `finishReason=error` surfaced)
+- [x] **PHEOBE-50** (`tickets/PHEOBE-50-codex-workspace-write-git-store.md`) — codex workspace-write sandbox gets `--add-dir` for the shared git dir + `$CARGO_TARGET_DIR`, so the engine can commit in a linked worktree
+- [x] **PHEOBE-44** (`tickets/PHEOBE-44-done-when-docs-vs-code.md`) — `done_when`: implement `files_exist`, drop `git_diff_matches` from docs. _(foreman s463, for FMN-4 tiered dispatch)_
 - coverage (cargo-llvm-cov, 2026-09-16, PHEOBE-34): 83.16% lines / 81.05% regions / 79.21% functions (`main.rs` 80.91%; was 79.31% / `main.rs` 0%)
 - [x] PHEOBE-31 — `pheobe doctor` prints compiled version vs crates.io / github tags
 - [x] PHEOBE-32 — `pheobe update` (`cargo install pheobe --locked --force`; git fallback) — shipped as 0.3.0

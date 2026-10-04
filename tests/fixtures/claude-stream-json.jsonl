@@ -1,0 +1,4 @@
+{"type": "control_response", "response": {"subtype": "success", "request_id": "pheobe_init"}}
+{"type": "control_request", "request_id": "req_1", "request": {"subtype": "can_use_tool", "tool_name": "Write", "input": {"file_path": "copy.txt", "content": "the answer is 42\n"}}}
+{"type": "control_request", "request_id": "req_2", "request": {"subtype": "can_use_tool", "tool_name": "Bash", "input": {"command": "cp hello.txt copy.txt && cat copy.txt", "description": "Copy hello.txt to copy.txt and verify contents"}}}
+{"type": "result", "subtype": "success", "is_error": false, "num_turns": 4, "result": "This session is read-only, so I cannot write files or run commands \u2014 only read operations are permitted.", "total_cost_usd": 0.022479700000000002, "usage": {"input_tokens": 34, "output_tokens": 632, "cache_read_input_tokens": 87917, "cache_creation_input_tokens": 5247}}

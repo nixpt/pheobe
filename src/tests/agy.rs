@@ -247,3 +247,28 @@ fn agy_registry_resolves() {
         "antigravity = alias for agy adapter (PHEOBE-25)"
     );
 }
+
+/// PHEOBE-46: task `model` → `--model`; strict still uses agy's native `--sandbox`.
+#[test]
+fn agy_run_with_task_model_and_native_strict() {
+    let _env = AgyEnv::lock();
+    let dir = scratch("run-with");
+    let (script, capture) = capture_agy(&dir, "ok", "SUCCESS");
+    set_env("PHEOBE_AGY_BIN", &script.to_string_lossy());
+    let ctx = crate::worker::WorkerCtx {
+        model: Some("gemini-3-pro".into()),
+        sandbox: Some(crate::sandbox::Tier::Strict),
+        ..Default::default()
+    };
+    AgyWorker.run_with("p", &dir, &ctx).unwrap();
+    let captured = std::fs::read_to_string(&capture).unwrap();
+    let lines: Vec<&str> = captured.lines().collect();
+    assert!(
+        lines.contains(&"--sandbox"),
+        "strict → agy's own sandbox: {captured}"
+    );
+    assert!(
+        lines.windows(2).any(|w| w == ["--model", "gemini-3-pro"]),
+        "{captured}"
+    );
+}
