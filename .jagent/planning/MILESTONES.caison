@@ -1,0 +1,75 @@
+@caison { version: "1.0" }
+
+schema: "milestones/1"
+
+project: {
+  name: "pheobe"
+  kind: "repo"
+  lifecycle: "shipped" @verified { at: "2026-10-14", by: "mile-seed" }
+  lifecycle_since: "2026-09-16"
+  home: "main"
+  ticket_prefix: "PHEOBE"
+  summary: "headless coding workhorse (task JSON in, worktree branch + handoff report out); v1.2.2 on crates.io; M3 fidelity work merged through PHEOBE-51, open field issues 13-15 and 17 remain"
+  north_star: "task JSON in, worktree branch + structured handoff report out, from any harness, never cooking in the source checkout"
+  stewards: ["foreman"]
+  evidence: {
+    default_branch: "main"
+    registries: [{ registry: "crates.io", name: "pheobe" }]
+  }
+}
+
+milestones: [
+  {
+    id: "M0"
+    title: "the loop exists"
+    status: "done" @verified { at: "2026-10-14", by: "mile-seed" }
+    done_at: "2026-09-16"
+    tickets: ["PHEOBE-1", "PHEOBE-2", "PHEOBE-3", "PHEOBE-13"]
+    done_when: [
+      { claim: "all M0 tickets closed", check: { kind: "tickets", status: "Done" } },
+      "live dogfood on three models ends ok:true",
+    ]
+  },
+  {
+    id: "M1"
+    title: "adoptable"
+    status: "done" @verified { at: "2026-10-14", by: "mile-seed" }
+    done_at: "2026-09-16"
+    tickets: ["PHEOBE-4", "PHEOBE-5", "PHEOBE-6", "PHEOBE-7", "PHEOBE-8", "PHEOBE-9", "PHEOBE-10", "PHEOBE-11", "PHEOBE-12", "PHEOBE-14", "PHEOBE-15", "PHEOBE-16", "PHEOBE-17", "PHEOBE-22", "PHEOBE-23", "PHEOBE-25", "PHEOBE-26"]
+    depends_on: ["M0"]
+    done_when: [
+      { claim: "all M1 tickets closed", check: { kind: "tickets", status: "Done" } },
+      "worker adapters, adoption kits, host mode (pheobe verify) and the ACP server exist",
+    ]
+    notes: "tickets 10, 11, 12, 14, 16 are not named in ROADMAP.md; TASKS.md files them under its own M1/M2 headings, which differ from ROADMAP's"
+  },
+  {
+    id: "M2"
+    title: "published and self-maintaining"
+    status: "done" @verified { at: "2026-10-14", by: "mile-seed" }
+    done_at: "2026-09-16"
+    version: "0.3.0"
+    tickets: ["PHEOBE-18", "PHEOBE-20", "PHEOBE-21", "PHEOBE-24", "PHEOBE-27", "PHEOBE-28", "PHEOBE-29", "PHEOBE-30", "PHEOBE-31", "PHEOBE-32", "PHEOBE-33"]
+    depends_on: ["M1"]
+    done_when: [
+      { claim: "all M2 tickets closed", check: { kind: "tickets", status: "Done" } },
+      { claim: "v0.3.0 tagged by the release channel", check: { kind: "tag", pattern: "v0.3.0" } },
+      { claim: "pheobe is on crates.io", check: { kind: "published", registry: "crates.io", name: "pheobe" } },
+    ]
+  },
+  {
+    id: "M3"
+    title: "fidelity and proof"
+    status: "active" @verified { at: "2026-10-14", by: "mile-seed" }
+    started_at: "2026-09-16"
+    tickets: ["PHEOBE-34", "PHEOBE-35", "PHEOBE-36", "PHEOBE-37", "PHEOBE-38", "PHEOBE-39", "PHEOBE-40", "PHEOBE-41", "PHEOBE-42", "PHEOBE-43", "PHEOBE-44", "PHEOBE-45", "PHEOBE-46", "PHEOBE-47", "PHEOBE-48", "PHEOBE-49", "PHEOBE-50", "PHEOBE-51"]
+    depends_on: ["M2"]
+    done_when: [
+      { claim: "engine parity released as v1.0.0", check: { kind: "tag", pattern: "v1.0.0" }, met: true @verified { at: "2026-10-14", by: "mile-seed" } },
+      { claim: "field issues 13, 14, 15 and 17 (.jagent/issues/) closed", met: false @verified { at: "2026-10-14", by: "mile-seed" } },
+      "closed-loop learning store graduated from opt-in (learn.rs, PHEOBE_MEMORY=host proven beyond joker-mcp)",
+      "in-process SDK workers where a harness needs them (cursor run.steer() / getUsage()), as a Worker trait extension",
+    ]
+    notes: "every M3 ticket on the board is merged (PHEOBE-34..51; v0.3.1 -> v1.2.2). Still open: field issues 13-15 and 17 (GitHub #3, #4 mirror 14 and 13), the kimi adapter's first live run, a native claude host kit (adopt/claude has no host/), the sandbox-tier mapping table, and the two ROADMAP goals above."
+  },
+]
