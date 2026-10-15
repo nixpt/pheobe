@@ -121,6 +121,7 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 - [ ] **PHEOBE-53** (`tickets/PHEOBE-53-scope-check-misses-engine-commits.md`) — scope check sees only uncommitted changes; engine commits (incl. `.pheobe/`) bypass `paths_allow` (P1)
 - [ ] **PHEOBE-54** (`tickets/PHEOBE-54-gate-evidence-and-coverage.md`) — excerpt the test summary, multi-command `done_when` (P2)
 - [ ] **PHEOBE-55** (`tickets/PHEOBE-55-claude-host-kit.md`) — Claude host-mode kit (P3)
+- [ ] **PHEOBE-56** (`tickets/PHEOBE-56-retire-kimi-worker.md`) — retire the `kimi` worker (cece line retirement, squadron SQ-242; after PHEOBE-52)
 - [x] **PHEOBE-51** (`tickets/PHEOBE-51-in-repo-worktrees.md`) — fleet repos (`.jagent/`) get worktrees inside at `.jagent/worktrees/<branch>` with sibling links (buckets `--path`, git fallback); others keep the sibling layout
 - [x] **PHEOBE-49** (`tickets/PHEOBE-49-cline-worker-adapter.md`) — cline worker adapter: `PHEOBE_PROVIDER=cline`, cline 3.x headless `--json`, final `run_result` parsed (prose, usage/cost, turns, `finishReason=error` surfaced)
 - [x] **PHEOBE-50** (`tickets/PHEOBE-50-codex-workspace-write-git-store.md`) — codex workspace-write sandbox gets `--add-dir` for the shared git dir + `$CARGO_TARGET_DIR`, so the engine can commit in a linked worktree
