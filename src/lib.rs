@@ -35,6 +35,7 @@ pub mod worker_claude;
 pub mod worker_claude_sdk;
 pub mod worker_cline;
 pub mod worker_codex;
+pub mod worker_copilot;
 pub mod worker_cursor;
 pub mod worker_kimi;
 pub mod worker_opencode;

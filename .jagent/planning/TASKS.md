@@ -52,6 +52,9 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
       `commits_since` (exit 128), no report; correct edits stranded — **reproduced unprompted on a 2nd task, P1**. Kitchen identity must be pheobe's — refuse
       `git init`/`clone`/`worktree` in the sandbox, verify the kitchen before diffing (found s500, vega, first
       dispatch through the Claude adoption kit)
+- [ ] **issue 18** (`../issues/18-engine-commits-bypass-paths-allow.md`) — the allowlist gate only checks the
+      dirty tree; an engine that commits by itself lands files outside `paths_allow` and the run reports
+      `ok: true` (found 2026-10-16, vega, PHEOBE-56 copilot sweep; engine-agnostic, P1)
 - [x] kit drift found s457 (Done, PHEOBE-22): `adopt/claude/self-agent.md` runs `pheobe run <file> --json` (no such
       flag); DESIGN.md's kit table lists `adopt/claude/host/agents/pheobe.md` which does not exist
       (claude has no host kit — the opencode host protocol was used instead); `testparse` labels a
@@ -121,6 +124,7 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 - [x] **PHEOBE-51** (`tickets/PHEOBE-51-in-repo-worktrees.md`) — fleet repos (`.jagent/`) get worktrees inside at `.jagent/worktrees/<branch>` with sibling links (buckets `--path`, git fallback); others keep the sibling layout
 - [x] **PHEOBE-49** (`tickets/PHEOBE-49-cline-worker-adapter.md`) — cline worker adapter: `PHEOBE_PROVIDER=cline`, cline 3.x headless `--json`, final `run_result` parsed (prose, usage/cost, turns, `finishReason=error` surfaced)
 - [x] **PHEOBE-50** (`tickets/PHEOBE-50-codex-workspace-write-git-store.md`) — codex workspace-write sandbox gets `--add-dir` for the shared git dir + `$CARGO_TARGET_DIR`, so the engine can commit in a linked worktree
+- [x] **PHEOBE-56** (`tickets/PHEOBE-56-copilot-worker-adapter.md`) — GitHub Copilot CLI worker adapter: `PHEOBE_PROVIDER=copilot`, `copilot -p … --output-format json`, JSONL stream parsed (prose, turns, `result.exitCode`), tokens from `--usage-output-file`; `git push`/`gh` always denied
 - [x] **PHEOBE-44** (`tickets/PHEOBE-44-done-when-docs-vs-code.md`) — `done_when`: implement `files_exist`, drop `git_diff_matches` from docs. _(foreman s463, for FMN-4 tiered dispatch)_
 - coverage (cargo-llvm-cov, 2026-09-16, PHEOBE-34): 83.16% lines / 81.05% regions / 79.21% functions (`main.rs` 80.91%; was 79.31% / `main.rs` 0%)
 - [x] PHEOBE-31 — `pheobe doctor` prints compiled version vs crates.io / github tags
