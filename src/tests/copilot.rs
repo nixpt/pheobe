@@ -124,7 +124,7 @@ fn copilot_args_headless_shape() {
             "-C",
             "/wt",
             "--deny-tool=shell(git push)",
-            "--deny-tool=shell(gh)",
+            "--deny-tool=shell(gh:*)",
         ]
     );
     let full = copilot_args(

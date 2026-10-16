@@ -2,7 +2,7 @@
 //!
 //! One prompt out, one whole Copilot run back:
 //! `copilot -p <prompt> --output-format json --no-ask-user -C <worktree>
-//! --deny-tool=shell(git push) --deny-tool=shell(gh) [--model m]
+//! --deny-tool=shell(git push) --deny-tool=shell(gh:*) [--model m]
 //! --usage-output-file <wt>/.pheobe/copilot-usage.json <flags>`
 //! (verified against `copilot --help`, Copilot CLI 1.0.98). The worktree is
 //! both the child's cwd and `-C`, so Copilot's own path verification (cwd +
@@ -21,7 +21,9 @@
 //! `PHEOBE_COPILOT_FLAGS` can drop them: the parent merges, pheobe never pushes
 //! or opens PRs, and the engine inherits a GitHub token (it is Copilot's auth).
 //! A Copilot deny rule beats every allow rule, `--allow-all-tools` included.
-//! `shell(gh)` with no subcommand matches every `gh` invocation.
+//! Verified live (1.0.98): `shell(git push)` denies `git push origin main`
+//! (Copilot matches git/gh on the first-level subcommand); `shell(gh:*)`
+//! denies `gh --version` and `gh api …` — a bare `shell(gh)` does NOT.
 //!
 //! Event stream (verified live, 1.0.98): `--output-format json` is JSONL, one
 //! `{"type":..,"data":{..}}` object per line — `assistant.message`
@@ -67,7 +69,7 @@ const DEFAULT_BIN: &str = "copilot";
 const DEFAULT_FLAGS: &str = "--allow-all-tools --disable-builtin-mcps";
 const DEFAULT_TIMEOUT_SECS: u64 = 3600;
 /// Always denied (see the module docs): pheobe never pushes or opens PRs.
-const DENY_TOOLS: &[&str] = &["shell(git push)", "shell(gh)"];
+const DENY_TOOLS: &[&str] = &["shell(git push)", "shell(gh:*)"];
 
 /// Copilot's state under `$HOME` that must stay writable in the moderate tier
 /// (stored login, session store, logs, auto-updated package cache).
