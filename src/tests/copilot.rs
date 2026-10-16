@@ -122,7 +122,9 @@ fn copilot_args_headless_shape() {
             "json",
             "--no-ask-user",
             "-C",
-            "/wt"
+            "/wt",
+            "--deny-tool=shell(git push)",
+            "--deny-tool=shell(gh)",
         ]
     );
     let full = copilot_args(
@@ -249,6 +251,10 @@ fn copilot_flags_env_replaces_the_default() {
     assert!(
         !captured.lines().any(|l| l == "--allow-all-tools"),
         "PHEOBE_COPILOT_FLAGS replaces the default: {captured}"
+    );
+    assert!(
+        captured.lines().any(|l| l == "--deny-tool=shell(git push)"),
+        "the push denial is policy, not a flag: {captured}"
     );
 }
 

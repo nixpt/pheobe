@@ -2,7 +2,8 @@
 //!
 //! One prompt out, one whole Copilot run back:
 //! `copilot -p <prompt> --output-format json --no-ask-user -C <worktree>
-//! [--model m] --usage-output-file <wt>/.pheobe/copilot-usage.json <flags>`
+//! --deny-tool=shell(git push) --deny-tool=shell(gh) [--model m]
+//! --usage-output-file <wt>/.pheobe/copilot-usage.json <flags>`
 //! (verified against `copilot --help`, Copilot CLI 1.0.98). The worktree is
 //! both the child's cwd and `-C`, so Copilot's own path verification (cwd +
 //! subdirs + temp) is scoped to pheobe's kitchen.
@@ -15,6 +16,12 @@
 //! GitHub (pheobe never pushes). Setting `PHEOBE_COPILOT_FLAGS` REPLACES the
 //! default entirely (cursor/agy convention); the mechanical args above are
 //! always passed.
+//!
+//! The two `--deny-tool` rules are pheobe policy, not flags, so no
+//! `PHEOBE_COPILOT_FLAGS` can drop them: the parent merges, pheobe never pushes
+//! or opens PRs, and the engine inherits a GitHub token (it is Copilot's auth).
+//! A Copilot deny rule beats every allow rule, `--allow-all-tools` included.
+//! `shell(gh)` with no subcommand matches every `gh` invocation.
 //!
 //! Event stream (verified live, 1.0.98): `--output-format json` is JSONL, one
 //! `{"type":..,"data":{..}}` object per line — `assistant.message`
@@ -59,6 +66,8 @@ use std::process::Stdio;
 const DEFAULT_BIN: &str = "copilot";
 const DEFAULT_FLAGS: &str = "--allow-all-tools --disable-builtin-mcps";
 const DEFAULT_TIMEOUT_SECS: u64 = 3600;
+/// Always denied (see the module docs): pheobe never pushes or opens PRs.
+const DENY_TOOLS: &[&str] = &["shell(git push)", "shell(gh)"];
 
 /// Copilot's state under `$HOME` that must stay writable in the moderate tier
 /// (stored login, session store, logs, auto-updated package cache).
@@ -184,8 +193,10 @@ impl Worker for CopilotWorker {
     }
 }
 
-/// `-p <prompt> --output-format json --no-ask-user -C <wt> [--model m]
-/// [--usage-output-file f] <flags…>`. Flags come last so they can add to
+/// `-p <prompt> --output-format json --no-ask-user -C <wt> --deny-tool=…
+/// [--model m] [--usage-output-file f] <flags…>`. `--deny-tool` takes the
+/// `=` form because it is variadic: a bare value after it would swallow the
+/// next positional. Flags come last so they can add to
 /// (or, for repeatable options, extend) the fixed shape.
 pub(crate) fn copilot_args(
     prompt: &str,
@@ -203,6 +214,7 @@ pub(crate) fn copilot_args(
         "-C".into(),
         worktree.display().to_string(),
     ];
+    a.extend(DENY_TOOLS.iter().map(|t| format!("--deny-tool={t}")));
     if let Some(m) = model {
         a.push("--model".into());
         a.push(m.to_string());
