@@ -1,0 +1,4 @@
+{
+  "task": "Add a docstring note to src/knowledge.rs explaining that ctx seed is idempotent (re-running keeps existing entries)",
+  "steps": []
+}
