@@ -118,6 +118,9 @@ source of truth; this board mirrors them (rebuilt 2026-09-16, s457).
 - [x] **PHEOBE-47** (`tickets/PHEOBE-47-sandbox-redirected-config.md`) — moderate sandbox mounts env-redirected engine config dirs (CLAUDE_CONFIG_DIR, OPENCODE_CONFIG_DIR, CECE_HOME/KIMI_SHARE_DIR); fixes "Not logged in" under agent-launch. _(foreman s463)_
 - [x] **PHEOBE-48** (`tickets/PHEOBE-48-exclude-pheobe-from-engine-commits.md`) — `.pheobe/` kept out of engine self-commits via the worktree's git exclude; forced commits named in doubts. _(foreman s463)_
 - [x] **PHEOBE-46** (`tickets/PHEOBE-46-engine-parity.md`) — engine parity: every worker honours model/ttl/sandbox (shared engine.rs), task `provider`, truthful usd/turns, error-after-commit = exit 1, kimi tail filter, codex timeout; fixes timed-out engines never being killed. _(foreman s463)_
+- [ ] **PHEOBE-53** (`tickets/PHEOBE-53-scope-check-misses-engine-commits.md`) — scope check sees only uncommitted changes; engine commits (incl. `.pheobe/`) bypass `paths_allow` (P1)
+- [ ] **PHEOBE-54** (`tickets/PHEOBE-54-gate-evidence-and-coverage.md`) — excerpt the test summary, multi-command `done_when` (P2)
+- [ ] **PHEOBE-55** (`tickets/PHEOBE-55-claude-host-kit.md`) — Claude host-mode kit (P3)
 - [x] **PHEOBE-51** (`tickets/PHEOBE-51-in-repo-worktrees.md`) — fleet repos (`.jagent/`) get worktrees inside at `.jagent/worktrees/<branch>` with sibling links (buckets `--path`, git fallback); others keep the sibling layout
 - [x] **PHEOBE-49** (`tickets/PHEOBE-49-cline-worker-adapter.md`) — cline worker adapter: `PHEOBE_PROVIDER=cline`, cline 3.x headless `--json`, final `run_result` parsed (prose, usage/cost, turns, `finishReason=error` surfaced)
 - [x] **PHEOBE-50** (`tickets/PHEOBE-50-codex-workspace-write-git-store.md`) — codex workspace-write sandbox gets `--add-dir` for the shared git dir + `$CARGO_TARGET_DIR`, so the engine can commit in a linked worktree
