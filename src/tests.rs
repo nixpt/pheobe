@@ -12,6 +12,7 @@ mod claude;
 mod claude_sdk;
 mod cline;
 mod contract;
+mod copilot;
 mod cursor;
 mod e2e;
 mod exclude;

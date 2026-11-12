@@ -3,7 +3,7 @@
 **A coding workhorse with no face. Task in, worktree branch + handoff report out.**
 
 pheobe is a headless coding agent built to be *adopted as a subagent* — by
-another agent harness (Claude Code, opencode, codex, cursor, kimi, agy, bro) or by
+another agent harness (Claude Code, opencode, codex, cursor, kimi, agy, Copilot CLI, bro) or by
 a human's shell. No TUI, no daemon, no session store. It takes a scoped task,
 does the work in its own git worktree on a fresh branch, verifies the result
 against a mechanical `done_when` gate, and returns one JSON report. It never
@@ -101,12 +101,12 @@ Everything is environment-driven; there is no config file.
 | variable | values | default |
 |---|---|---|
 | `PHEOBE_BASE_URL` / `PHEOBE_MODEL` / `PHEOBE_API_KEY` | the self-mode endpoint | — |
-| `PHEOBE_PROVIDER` | `openai` (built-in turn loop) or a worker adapter: `opencode`, `claude`, `claude-sdk`, `codex`, `cursor`, `kimi`, `agy`; wins over the task's `provider` | task `provider`, else `openai` |
+| `PHEOBE_PROVIDER` | `openai` (built-in turn loop) or a worker adapter: `opencode`, `claude`, `claude-sdk`, `codex`, `cursor`, `kimi`, `agy`, `cline`, `copilot`; wins over the task's `provider` | task `provider`, else `openai` |
 | `PHEOBE_SANDBOX` | `strict` \| `moderate` \| `free` (bwrap tiers; env wins over the task's `sandbox`) | `moderate` |
 | `PHEOBE_MEMORY` | `none` \| `local` \| `host` (host = a joker-mcp memory store) | `local` |
 | `PHEOBE_KEEP_WORKTREE` | `1` / `true` / `yes` — leave a failed-run worktree on disk | unset (tear down on early `run` error) |
 | `PHEOBE_<PROVIDER>_BIN` / `_FLAGS` / `_TIMEOUT_SECS` | per-adapter binary, extra flags, wall-clock cap. Every adapter: effective cap = min(this, task `ttl`), and a timed-out engine is killed | adapter default |
-| `PHEOBE_<PROVIDER>_MODEL` | per-adapter model (`CLAUDE`, `OPENCODE`, `CODEX`, `CURSOR`, `KIMI`, `AGY`); wins over the task's `model` | unset (task `model`, else the CLI's default) |
+| `PHEOBE_<PROVIDER>_MODEL` | per-adapter model (`CLAUDE`, `OPENCODE`, `CODEX`, `CURSOR`, `KIMI`, `AGY`, `CLINE`, `COPILOT`); wins over the task's `model` | unset (task `model`, else the CLI's default) |
 | `PHEOBE_CLAUDE_SDK_ALLOW` | claude-sdk: comma list of extra tools to allow outright (e.g. `WebFetch`) | unset |
 | `PHEOBE_CLAUDE_SDK_GRACE_SECS` | claude-sdk: seconds to wait for a result after the TTL `interrupt` before killing | `10` |
 
@@ -124,6 +124,7 @@ way, and the report carries what the engine actually did:
 | `agy` | `--model` | pheobe bwrap | agy `--sandbox` | none (not reported) |
 | `cursor` | `--model` | cursor `--sandbox enabled` | cursor `--sandbox enabled` | `chargedCents / 100` |
 | `codex` | `-m` | codex `--sandbox workspace-write` | codex `--sandbox read-only` | none (no price table invented) |
+| `copilot` | `--model` | pheobe bwrap | refused | none (premium requests, not USD) |
 
 pheobe bwrap = the WHOLE engine run in bwrap with the network shared, `$HOME`
 read-only except the engine's own state dirs (e.g. `~/.claude`,
@@ -136,10 +137,31 @@ An engine that fails **after** committing reports `ok:false` with its commits
 **Redirected engine config (PHEOBE-47).** When a caller relocates an engine's config/auth dir via env
 (agent-launch's per-agent home does), `moderate` mounts it **writable** so the engine still finds its
 login: claude/claude-sdk `CLAUDE_CONFIG_DIR`, opencode `OPENCODE_CONFIG_DIR`, kimi (cece) `CECE_HOME` then
-`KIMI_SHARE_DIR`; agy reads none; codex/cursor use their native sandbox. Only existing absolute dirs are
+`KIMI_SHARE_DIR`, copilot `COPILOT_HOME`; agy reads none; codex/cursor use their native sandbox. Only existing absolute dirs are
 bound (never `/`, `$HOME` or an ancestor); a symlink inside one (e.g. `.credentials.json` → `~/.claude/…`)
 keeps resolving — its target is mounted read-only unless an existing mount covers it. Each bind is logged
 to stderr (`pheobe: <engine> moderate sandbox: binding $VAR=…`).
+
+### The `copilot` worker (PHEOBE-56)
+
+`PHEOBE_PROVIDER=copilot` runs the GitHub Copilot CLI (`npm i -g @github/copilot`) headless in
+the worktree:
+
+```text
+copilot -p <prompt> --output-format json --no-ask-user -C <worktree>
+        --deny-tool=shell(git push) --deny-tool=shell(gh:*) [--model <m>]
+        --usage-output-file <worktree>/.pheobe/copilot-usage.json
+        --allow-all-tools --disable-builtin-mcps        # PHEOBE_COPILOT_FLAGS replaces this line
+```
+
+Auth is Copilot's own (`COPILOT_GITHUB_TOKEN` / `GH_TOKEN` / `GITHUB_TOKEN`, or `copilot login`);
+each run spends the account's Copilot premium requests. In `-p` mode a tool that needs approval
+is denied, never prompted, so `--allow-all-tools` is what lets the engine edit and run
+`done_when`; Copilot's path check still keeps file tools inside the worktree. `git push` and
+every `gh` call are always denied — a deny rule beats `--allow-all-tools`, and those two are
+fixed args, not flags. The report's `turns` counts Copilot's turns; tokens come from the usage
+file (the JSONL stream has none) and feed the `budget.max_usd` guard via
+`PHEOBE_USD_PER_MTOK`; there is no USD figure.
 
 ### The `claude-sdk` worker (PHEOBE-45)
 
